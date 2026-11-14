@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Save The People Charitable Trust — Official Portal & Billing</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Razorpay Checkout Script -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .font-serif-heading { font-family: 'Playfair Display', Georgia, serif; }
+    @media print {
+      body * { visibility: hidden; }
+      #printable-receipt, #printable-receipt * { visibility: visible; }
+      #printable-receipt { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body class="bg-[#F8F9FA] text-slate-800 antialiased selection:bg-[#E22D4E] selection:text-white">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // --- NUMBER TO WORDS (INDIAN CURRENCY FORMAT) ---
+    function numberToWordsINR(num) {
+      if (!num || isNaN(num)) return "Zero Rupees Only";
+      const a = ['','One ','Two ','Three ','Four ','Five ','Six ','Seven ','Eight ','Nine ','Ten ','Eleven ','Twelve ','Thirteen ','Fourteen ','Fifteen ','Sixteen ','Seventeen ','Eighteen ','Nineteen '];
+      const b = ['', '', 'Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+
+      function inWords(n) {
+        if ((n = n.toString()).length > 9) return 'overflow';
+        let n_arr = ('000000000' + n).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+        if (!n_arr) return '';
+        let str = '';
+        str += (n_arr[1] != 0) ? (a[Number(n_arr[1])] || b[n_arr[1][0]] + ' ' + a[n_arr[1][1]]) + 'Crore ' : '';
+        str += (n_arr[2] != 0) ? (a[Number(n_arr[2])] || b[n_arr[2][0]] + ' ' + a[n_arr[2][1]]) + 'Lakh ' : '';
+        str += (n_arr[3] != 0) ? (a[Number(n_arr[3])] || b[n_arr[3][0]] + ' ' + a[n_arr[3][1]]) + 'Thousand ' : '';
+        str += (n_arr[4] != 0) ? (a[Number(n_arr[4])] || b[n_arr[4][0]] + ' ' + a[n_arr[4][1]]) + 'Hundred ' : '';
+        str += (n_arr[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n_arr[5])] || b[n_arr[5][0]] + ' ' + a[n_arr[5][1]]) : '';
+        return str.trim();
+      }
+      return `${inWords(num)} Rupees Only`;
+    }
+
+    // --- DEFAULT TRUST ORGANISATION SETTINGS ---
+    const DEFAULT_ORG_SETTINGS = {
+      orgName: "SAVE THE PEOPLE CHARITABLE TRUST",
+      regNo: "TRUST/KA/2014/00892",
+      orgPan: "AACTS8921K",
+      address: "No. 42, Karuna Nilayam, 3rd Cross, Indiranagar, Bengaluru - 560038, Karnataka, India",
+      phone: "+91 (0) 80 4123 4567 / +91 98765 43210",
+      email: "contact@savethepeople.org",
+      section12A: "12A/BLR/2016-17/A-9012",
+      section80G: "80G/BLR/CIT(E)/2021-22/DEL-89021",
+      section80GValidity: "Perpetual / AY 2022-23 to AY 2026-27",
+      trusteeName: "K. R. Venkatraman",
+      trusteeDesignation: "Managing Trustee",
+      receiptPrefix: "STPCT",
+      currentFY: "2026-27"
+    };
+
+    // --- INITIAL SEED DONATION RECEIPTS (CHRONOLOGICAL) ---
+    const INITIAL_RECEIPTS = [
+      {
+        id: "REC-001",
+        receiptNo: "STPCT/2026-27/000001",
+        date: "2026-11-14",
+        financialYear: "2026-27",
+        month: "November",
+        donorName: "Aarav Sharma",
+        pan: "ABCDE1234F",
+        mobile: "+91 98765 43210",
+        email: "aarav.sharma@gmail.com",
+        address: "Bengaluru, Karnataka",
+        amount: 5000,
+        amountInWords: "Five Thousand Rupees Only",
+        purpose: "Emergency Hunger Relief",
+        paymentMode: "UPI",
+        refNo: "UPI/3902188201",
+        status: "Completed",
+        activities: [
+          {
+            id: "ACT-01",
+            date: "2026-11-14",
+            name: "Dry Ration Kits Distribution",
+            category: "Food Support",
+            note: "Distributed 8 dry ration packets to displaced daily wage families.",
+            amountUtilised: 3800,
+            beneficiary: "8 Families in Hosur Slum",
+            files: ["bill_grocery_14nov.pdf"]
+          }
+        ]
+      },
+      {
+        id: "REC-002",
+        receiptNo: "STPCT/2026-27/000002",
+        date: "2026-11-14",
+        financialYear: "2026-27",
+        month: "November",
+        donorName: "Priya Iyer",
+        pan: "XYZPE9876K",
+        mobile: "+91 98221 11223",
+        email: "priya.iyer@outlook.com",
+        address: "Chennai, Tamil Nadu",
+        amount: 2500,
+        amountInWords: "Two Thousand Five Hundred Rupees Only",
+        purpose: "Medical Support",
+        paymentMode: "Bank Transfer",
+        refNo: "NEFT-HDFC00921",
+        status: "Completed",
+        activities: [
+          {
+            id: "ACT-02",
+            date: "2026-11-14",
+            name: "Pediatric Dialysis Medication",
+            category: "Medical Care",
+            note: "Supplied essential dialysis fluid and injections for child ward patient.",
+            amountUtilised: 2500,
+            beneficiary: "Master Vignesh (Age 9)",
+            files: ["apollo_pharmacy_bill.pdf", "treatment_photo.jpg"]
+          }
+        ]
+      },
+      {
+        id: "REC-003",
+        receiptNo: "STPCT/2026-27/000003",
+        date: "2026-11-13",
+        financialYear: "2026-27",
+        month: "November",
+        donorName: "Rajesh Patel",
+        pan: "PLKJH4321R",
+        mobile: "+91 99001 88772",
+        email: "rajesh.patel@live.com",
+        address: "Ahmedabad, Gujarat",
+        amount: 10000,
+        amountInWords: "Ten Thousand Rupees Only",
+        purpose: "Education Support",
+        paymentMode: "UPI",
+        refNo: "UPI/3901188099",
+        status: "Completed",
+        activities: [
+          {
+            id: "ACT-03",
+            date: "2026-11-13",
+            name: "School Uniforms and Shoes Kit",
+            category: "Child Education",
+            note: "Purchased winter school uniform sets and shoes for 10 slum children.",
+            amountUtilised: 7200,
+            beneficiary: "Govt School Students, Ward 12",
+            files: ["uniform_store_invoice.pdf"]
+          }
+        ]
+      },
+      {
+        id: "REC-004",
+        receiptNo: "STPCT/2026-27/000004",
+        date: "2026-11-10",
+        financialYear: "2026-27",
+        month: "November",
+        donorName: "Sneha Verma",
+        pan: "",
+        mobile: "+91 91234 56789",
+        email: "sneha.v@techcorp.in",
+        address: "Hyderabad, Telangana",
+        amount: 1000,
+        amountInWords: "One Thousand Rupees Only",
+        purpose: "General Donation",
+        paymentMode: "Cash",
+        refNo: "CASH-REC-101",
+        status: "Completed",
+        activities: []
+      }
+    ];
+
+    // --- INITIAL SEED BANK ACCOUNTS & TRANSACTIONS ---
+    const INITIAL_BANK_ACCOUNTS = [
+      {
+        id: "BANK-01",
+        bankName: "State Bank of India (SBI)",
+        holderName: "SAVE THE PEOPLE CHARITABLE TRUST",
+        accountNo: "38920199210",
+        ifsc: "SBIN0004123",
+        branch: "Indiranagar, Bengaluru",
+        type: "Savings / Trust Current",
+        openingBalance: 125000,
+        currentBalance: 143500
+      },
+      {
+        id: "BANK-02",
+        bankName: "HDFC Bank",
+        holderName: "SAVE THE PEOPLE CHARITABLE TRUST",
+        accountNo: "50200089211029",
+        ifsc: "HDFC0001890",
+        branch: "MG Road, Bengaluru",
+        type: "Donation Collection Account",
+        openingBalance: 45000,
+        currentBalance: 45000
+      }
+    ];
+
+    const INITIAL_BANK_TRANSACTIONS = [
+      { id: "TXN-01", date: "2026-11-14", desc: "UPI/Aarav Sharma/Donation", ref: "UPI/3902188201", credit: 5000, debit: 0, balance: 143500, matchStatus: "Matched", receiptNo: "STPCT/2026-27/000001" },
+      { id: "TXN-02", date: "2026-11-14", desc: "NEFT CR-HDFC-Priya Iyer", ref: "NEFT-HDFC00921", credit: 2500, debit: 0, balance: 138500, matchStatus: "Matched", receiptNo: "STPCT/2026-27/000002" },
+      { id: "TXN-03", date: "2026-11-13", desc: "UPI/Rajesh Patel/Donation", ref: "UPI/3901188099", credit: 10000, debit: 0, balance: 136000, matchStatus: "Matched", receiptNo: "STPCT/2026-27/000003" },
+      { id: "TXN-04", date: "2026-11-12", desc: "DIRECT DEPOSIT - SELF DONATION", ref: "CHQ/901238", credit: 1000, debit: 0, balance: 126000, matchStatus: "Pending Verification", receiptNo: "" }
+    ];
+
+    // Indian Financial Year Month List (April to March)
+    const FY_MONTHS = [
+      "April", "May", "June", "July", "August", "September",
+      "October", "November", "December", "January", "February", "March"
+    ];
+
+    const DONATION_PURPOSES = [
+      "General Donation",
+      "Family Support",
+      "Medical Support",
+      "Education Support",
+      "Child Welfare",
+      "Women Empowerment",
+      "Food & Grocery Support",
+      "Other"
+    ];
+
+    const ACTIVITY_CATEGORIES = [
+      "Food Support",
+      "Medical Care",
+      "Child Education",
+      "Family Support",
+      "Women Empowerment",
+      "Blood Donation Camp",
+      "Health Camp",
+      "Emergency Relief",
+      "Other"
+    ];
+
+    // --- MAIN REACT APPLICATION ---
+    function App() {
+      // Clean view state
+      const isPathAdmin = () => {
+        const path = window.location.pathname.toLowerCase();
+        return path.endsWith('/admin') || window.location.hash === '#admin';
+      };
+
+      const [view, setViewState] = useState(() => isPathAdmin() ? 'admin' : 'public');
+      const [adminSubSection, setAdminSubSection] = useState('dashboard'); // 'dashboard' | 'receipts' | 'statements' | 'activities' | 'reports' | 'settings'
+
+      // Master Records State
+      const [orgSettings, setOrgSettings] = useState(() => {
+        try {
+          const saved = localStorage.getItem('stp_org_settings');
+          return saved ? JSON.parse(saved) : DEFAULT_ORG_SETTINGS;
+        } catch(e) { return DEFAULT_ORG_SETTINGS; }
+      });
+
+      const [receipts, setReceipts] = useState(() => {
+        try {
+          const saved = localStorage.getItem('stp_receipts');
+          return saved ? JSON.parse(saved) : INITIAL_RECEIPTS;
+        } catch(e) { return INITIAL_RECEIPTS; }
+      });
+
+      const [bankAccounts, setBankAccounts] = useState(INITIAL_BANK_ACCOUNTS);
+      const [bankTransactions, setBankTransactions] = useState(INITIAL_BANK_TRANSACTIONS);
+
+      // Selected FY, Month, Date hierarchy filter
+      const [selectedFY, setSelectedFY] = useState("2026-27");
+      const [selectedMonth, setSelectedMonth] = useState("November");
+      const [selectedDate, setSelectedDate] = useState("");
+
+      // Global Search Bar
+      const [globalSearch, setGlobalSearch] = useState("");
+
+      // Modals
+      const [activeReceiptModal, setActiveReceiptModal] = useState(null); // Full Receipt View / Print Modal
+      const [isCreateReceiptOpen, setIsCreateReceiptOpen] = useState(false);
+      const [receiptActivityTarget, setReceiptActivityTarget] = useState(null); // Receipt linked to Add Activity
+      const [notification, setNotification] = useState(null);
+
+      // Persist receipts
+      useEffect(() => {
+        try {
+          localStorage.setItem('stp_receipts', JSON.stringify(receipts));
+        } catch(e) {}
+      }, [receipts]);
+
+      useEffect(() => {
+        try {
+          localStorage.setItem('stp_org_settings', JSON.stringify(orgSettings));
+        } catch(e) {}
+      }, [orgSettings]);
+
+      const notify = (msg, type = 'success') => {
+        setNotification({ msg, type });
+        setTimeout(() => setNotification(null), 4000);
+      };
+
+      const setView = (newView) => {
+        setViewState(newView);
+        try {
+          if (window.location.protocol.startsWith('http')) {
+            window.history.pushState({}, '', newView === 'admin' ? '/admin' : '/');
+          } else {
+            window.location.hash = newView === 'admin' ? 'admin' : '';
+          }
+        } catch(e) {}
+      };
+
+      // --- FINANCIAL YEAR TOTALS & CALCULATIONS ---
+      const fyTotals = useMemo(() => {
+        const fyReceipts = receipts.filter(r => r.financialYear === selectedFY && r.status !== 'Cancelled');
+        const totalDonations = fyReceipts.reduce((acc, r) => acc + Number(r.amount || 0), 0);
+        
+        let totalUtilised = 0;
+        let totalActivitiesCount = 0;
+        fyReceipts.forEach(r => {
+          (r.activities || []).forEach(a => {
+            totalUtilised += Number(a.amountUtilised || 0);
+            totalActivitiesCount++;
+          });
+        });
+
+        const remainingFunds = totalDonations - totalUtilised;
+        const totalBankBalance = bankAccounts.reduce((acc, b) => acc + Number(b.currentBalance || 0), 0);
+        const unmatchedTxns = bankTransactions.filter(t => t.matchStatus !== 'Matched').length;
+
+        return {
+          totalDonations,
+          totalReceipts: fyReceipts.length,
+          totalUtilised,
+          remainingFunds,
+          totalBankBalance,
+          unmatchedTxns,
+          totalActivitiesCount
+        };
+      }, [receipts, bankAccounts, bankTransactions, selectedFY]);
+
+      return (
+        <div className="min-h-screen flex flex-col justify-between">
+          
+          {/* Notification Toast */}
+          {notification && (
+            <div className={`fixed top-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-white transition-all transform animate-bounce ${
+              notification.type === 'success' ? 'bg-[#00A859]' : 'bg-[#E22D4E]'
+            }`}>
+              <span className="text-base">{notification.type === 'success' ? '✓' : '⚠️'}</span>
+              <span className="font-semibold text-sm">{notification.msg}</span>
+            </div>
+          )}
+
+          {/* PUBLIC vs ADMIN ROUTER */}
+          {view === 'public' ? (
+            <PublicLandingView onOpenAdmin={() => setView('admin')} />
+          ) : (
+            <AdminBillingSystem 
+              adminSubSection={adminSubSection}
+              setAdminSubSection={setAdminSubSection}
+              onBackToPublic={() => setView('public')}
+              orgSettings={orgSettings}
+              setOrgSettings={setOrgSettings}
+              receipts={receipts}
+              setReceipts={setReceipts}
+              bankAccounts={bankAccounts}
+              setBankAccounts={setBankAccounts}
+              bankTransactions={bankTransactions}
+              setBankTransactions={setBankTransactions}
+              selectedFY={selectedFY}
+              setSelectedFY={setSelectedFY}
+              selectedMonth={selectedMonth}
+              setSelectedMonth={setSelectedMonth}
+              selectedDate={selectedDate}
+              setSelectedDate={setSelectedDate}
+              globalSearch={globalSearch}
+              setGlobalSearch={setGlobalSearch}
+              fyTotals={fyTotals}
+              onViewReceipt={(r) => setActiveReceiptModal(r)}
+              onOpenCreateReceipt={() => setIsCreateReceiptOpen(true)}
+              onOpenActivitiesForReceipt={(r) => setReceiptActivityTarget(r)}
+              notify={notify}
+            />
+          )}
+
+          {/* VIEW / PRINT DONATION RECEIPT MODAL */}
+          {activeReceiptModal && (
+            <ReceiptViewModal 
+              receipt={activeReceiptModal}
+              orgSettings={orgSettings}
+              onClose={() => setActiveReceiptModal(null)}
+              notify={notify}
+            />
+          )}
+
+          {/* CREATE DONATION RECEIPT MODAL */}
+          {isCreateReceiptOpen && (
+            <CreateReceiptModal 
+              orgSettings={orgSettings}
+              receipts={receipts}
+              onClose={() => setIsCreateReceiptOpen(false)}
+              onSave={(newRec, createNext = false) => {
+                setReceipts([newRec, ...receipts]);
+                notify(`Receipt ${newRec.receiptNo} created successfully!`);
+                if (!createNext) {
+                  setIsCreateReceiptOpen(false);
+                  setActiveReceiptModal(newRec); // Auto open PDF view
+                }
+              }}
+            />
+          )}
+
+          {/* RECEIPT-LINKED ACTIVITIES MODAL */}
+          {receiptActivityTarget && (
+            <ReceiptActivityModal 
+              receipt={receiptActivityTarget}
+              onClose={() => setReceiptActivityTarget(null)}
+              onAddActivity={(newAct) => {
+                const updated = receipts.map(r => {
+                  if (r.id === receiptActivityTarget.id) {
+                    const acts = r.activities || [];
+                    return { ...r, activities: [newAct, ...acts] };
+                  }
+                  return r;
+                });
+                setReceipts(updated);
+                setReceiptActivityTarget({
+                  ...receiptActivityTarget,
+                  activities: [newAct, ...(receiptActivityTarget.activities || [])]
+                });
+                notify(`Activity "${newAct.name}" linked to ${receiptActivityTarget.receiptNo}!`);
+              }}
+            />
+          )}
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 2. ADMIN BILLING SYSTEM (FULL SPLIT NAVIGATION + 6 SECTIONS)
+    // =========================================================================
+    function AdminBillingSystem({
+      adminSubSection,
+      setAdminSubSection,
+      onBackToPublic,
+      orgSettings,
+      setOrgSettings,
+      receipts,
+      setReceipts,
+      bankAccounts,
+      setBankAccounts,
+      bankTransactions,
+      setBankTransactions,
+      selectedFY,
+      setSelectedFY,
+      selectedMonth,
+      setSelectedMonth,
+      selectedDate,
+      setSelectedDate,
+      globalSearch,
+      setGlobalSearch,
+      fyTotals,
+      onViewReceipt,
+      onOpenCreateReceipt,
+      onOpenActivitiesForReceipt,
+      notify
+    }) {
+
+      return (
+        <div className="min-h-screen flex flex-col md:flex-row bg-[#F4F6F9]">
+          
+          {/* --- LEFT SIDEBAR (BILLING SECTIONS) --- */}
+          <aside className="w-full md:w-72 bg-[#10141E] text-white shrink-0 flex flex-col justify-between border-r border-slate-800">
+            <div className="p-6 space-y-7">
+              
+              {/* Trust Badge & Header */}
+              <div className="flex items-center gap-3.5 pb-6 border-b border-slate-800">
+                <img 
+                  src="images/save_the_people_logo.jpeg" 
+                  alt="Save The People" 
+                  className="h-11 w-auto object-contain rounded-lg"
+                  onError={e => e.target.style.display = 'none'}
+                />
+                <div className="overflow-hidden">
+                  <h2 className="font-extrabold text-sm text-white truncate tracking-tight">SAVE THE PEOPLE</h2>
+                  <p className="text-[10px] uppercase font-bold text-rose-500 tracking-wider">Charitable Trust</p>
+                </div>
+              </div>
+
+              {/* Financial Year Selector */}
+              <div className="bg-slate-900/90 p-3 rounded-2xl border border-slate-800 space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Financial Year</label>
+                <select 
+                  value={selectedFY} 
+                  onChange={e => setSelectedFY(e.target.value)}
+                  className="w-full bg-transparent text-xs font-bold text-amber-400 focus:outline-none cursor-pointer"
+                >
+                  <option value="2026-27" className="bg-slate-900">FY 2026–2027 (Active)</option>
+                  <option value="2025-26" className="bg-slate-900">FY 2025–2026 (Audit Archive)</option>
+                  <option value="2024-25" className="bg-slate-900">FY 2024–2025 (Historical)</option>
+                </select>
+              </div>
+
+              {/* Main Navigation (The 6 Prescribed Sections) */}
+              <nav className="space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 px-3">
+                  Admin Panel → Billing
+                </p>
+
+                {[
+                  { id: 'dashboard', label: '1. Dashboard', icon: '📊' },
+                  { id: 'receipts', label: '2. Donation Receipts', icon: '🧾' },
+                  { id: 'statements', label: '3. Bank Statements', icon: '🏦' },
+                  { id: 'activities', label: '4. Activities', icon: '🎯' },
+                  { id: 'reports', label: '5. Financial Reports', icon: '📈' },
+                  { id: 'settings', label: '6. Receipt & Org Settings', icon: '⚙️' }
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setAdminSubSection(item.id)}
+                    className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-xs font-bold transition ${
+                      adminSubSection === item.id 
+                        ? 'bg-[#E22D4E] text-white shadow-lg shadow-[#E22D4E]/30' 
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <span className="text-base">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </nav>
+
+            </div>
+
+            {/* Sidebar Bottom CTA */}
+            <div className="p-6 border-t border-slate-800 space-y-3">
+              <button
+                onClick={onOpenCreateReceipt}
+                className="w-full bg-[#E22D4E] hover:bg-[#c92040] text-white font-extrabold text-xs py-3 rounded-2xl shadow-md transition flex items-center justify-center gap-2"
+              >
+                <span>➕</span>
+                <span>Create New Receipt</span>
+              </button>
+              <button
+                onClick={onBackToPublic}
+                className="w-full bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs py-2.5 rounded-2xl transition flex items-center justify-center gap-2"
+              >
+                <span>🌐</span>
+                <span>View Public Website</span>
+              </button>
+            </div>
+          </aside>
+
+          {/* --- RIGHT DISPLAY AREA --- */}
+          <section className="flex-1 p-6 md:p-8 space-y-6 overflow-x-hidden">
+            
+            {/* Global Search Bar (Section 13) */}
+            <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="relative flex-1 w-full">
+                <span className="absolute left-4 top-3 text-slate-400 text-sm">🔍</span>
+                <input 
+                  type="text"
+                  placeholder="Global Search across Financial Years (Receipt No, Donor Name, Mobile, PAN, UTR, Activity)..."
+                  value={globalSearch}
+                  onChange={e => setGlobalSearch(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#E22D4E]"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                <span className="bg-emerald-50 text-[#00A859] text-[11px] font-extrabold px-3 py-1.5 rounded-xl border border-emerald-100">
+                  FY: {selectedFY}
+                </span>
+                <button
+                  onClick={onOpenCreateReceipt}
+                  className="bg-[#10141E] hover:bg-[#E22D4E] text-white text-xs font-bold px-4 py-2 rounded-xl transition"
+                >
+                  + Entry
+                </button>
+              </div>
+            </div>
+
+            {/* SECTION ROUTER */}
+            {adminSubSection === 'dashboard' && (
+              <SectionDashboard 
+                fyTotals={fyTotals}
+                selectedFY={selectedFY}
+                receipts={receipts}
+                bankAccounts={bankAccounts}
+                onViewReceipt={onViewReceipt}
+                setAdminSubSection={setAdminSubSection}
+              />
+            )}
+
+            {adminSubSection === 'receipts' && (
+              <SectionDonationReceipts 
+                receipts={receipts}
+                setReceipts={setReceipts}
+                selectedFY={selectedFY}
+                setSelectedFY={setSelectedFY}
+                selectedMonth={selectedMonth}
+                setSelectedMonth={setSelectedMonth}
+                selectedDate={selectedDate}
+                setSelectedDate={setSelectedDate}
+                globalSearch={globalSearch}
+                onViewReceipt={onViewReceipt}
+                onOpenCreateReceipt={onOpenCreateReceipt}
+                onOpenActivities={onOpenActivitiesForReceipt}
+                notify={notify}
+              />
+            )}
+
+            {adminSubSection === 'statements' && (
+              <SectionBankStatements 
+                bankAccounts={bankAccounts}
+                setBankAccounts={setBankAccounts}
+                bankTransactions={bankTransactions}
+                setBankTransactions={setBankTransactions}
+                receipts={receipts}
+                selectedFY={selectedFY}
+                notify={notify}
+              />
+            )}
+
+            {adminSubSection === 'activities' && (
+              <SectionActivitiesMain 
+                receipts={receipts}
+                setReceipts={setReceipts}
+                selectedFY={selectedFY}
+                notify={notify}
+              />
+            )}
+
+            {adminSubSection === 'reports' && (
+              <SectionFinancialReports 
+                receipts={receipts}
+                bankAccounts={bankAccounts}
+                bankTransactions={bankTransactions}
+                selectedFY={selectedFY}
+                selectedMonth={selectedMonth}
+                setSelectedMonth={setSelectedMonth}
+                orgSettings={orgSettings}
+                notify={notify}
+              />
+            )}
+
+            {adminSubSection === 'settings' && (
+              <SectionSettings 
+                orgSettings={orgSettings}
+                setOrgSettings={setOrgSettings}
+                notify={notify}
+              />
+            )}
+
+          </section>
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // SECTION 1: DASHBOARD
+    // =========================================================================
+    function SectionDashboard({ fyTotals, selectedFY, receipts, bankAccounts, onViewReceipt, setAdminSubSection }) {
+      return (
+        <div className="space-y-6">
+          {/* Top 7 Metrics Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">1. Total Donations</span>
+              <p className="text-2xl font-extrabold text-slate-900">₹{fyTotals.totalDonations.toLocaleString()}</p>
+              <p className="text-[11px] text-[#00A859] font-semibold">{fyTotals.totalReceipts} Verified Receipts</p>
+            </div>
+
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">2. Total Receipts</span>
+              <p className="text-2xl font-extrabold text-slate-900">{fyTotals.totalReceipts}</p>
+              <p className="text-[11px] text-slate-500 font-semibold">FY {selectedFY}</p>
+            </div>
+
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">3. Amount Utilised</span>
+              <p className="text-2xl font-extrabold text-[#E22D4E]">₹{fyTotals.totalUtilised.toLocaleString()}</p>
+              <p className="text-[11px] text-slate-500 font-semibold">{fyTotals.totalActivitiesCount} Logged Activities</p>
+            </div>
+
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">4. Remaining Funds</span>
+              <p className="text-2xl font-extrabold text-[#00A859]">₹{fyTotals.remainingFunds.toLocaleString()}</p>
+              <p className="text-[11px] text-slate-500 font-semibold">Available for Disbursement</p>
+            </div>
+
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">5. Bank Balance</span>
+              <p className="text-2xl font-extrabold text-slate-900">₹{fyTotals.totalBankBalance.toLocaleString()}</p>
+              <p className="text-[11px] text-slate-500 font-semibold">Across {bankAccounts.length} Trust Accounts</p>
+            </div>
+
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">6. Unmatched Bank Txns</span>
+              <p className="text-2xl font-extrabold text-amber-500">{fyTotals.unmatchedTxns}</p>
+              <p className="text-[11px] text-slate-500 font-semibold">Requires Receipt Match</p>
+            </div>
+
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-1 col-span-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">7. Income vs Utilisation Rate</span>
+              <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden mt-2">
+                <div 
+                  className="bg-[#E22D4E] h-3 rounded-full" 
+                  style={{ width: `${Math.min(100, Math.round((fyTotals.totalUtilised / (fyTotals.totalDonations || 1)) * 100))}%` }}
+                ></div>
+              </div>
+              <p className="text-[11px] text-slate-500 font-semibold pt-1">
+                {Math.min(100, Math.round((fyTotals.totalUtilised / (fyTotals.totalDonations || 1)) * 100))}% funds deployed towards charitable activities
+              </p>
+            </div>
+
+          </div>
+
+          {/* Quick Table: Recent Receipts */}
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-sm">Recent Donation Receipts (FY {selectedFY})</h3>
+                <p className="text-[11px] text-slate-500">Chronological entries with instant PDF & activities actions</p>
+              </div>
+              <button 
+                onClick={() => setAdminSubSection('receipts')}
+                className="text-xs font-bold text-[#E22D4E] hover:underline"
+              >
+                Open Full Date-Wise Ledger →
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold tracking-wider">
+                  <tr>
+                    <th className="py-3 px-5">Receipt No</th>
+                    <th className="py-3 px-5">Date</th>
+                    <th className="py-3 px-5">Donor Name</th>
+                    <th className="py-3 px-5">Mobile</th>
+                    <th className="py-3 px-5">Purpose</th>
+                    <th className="py-3 px-5">Amount</th>
+                    <th className="py-3 px-5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {receipts.slice(0, 5).map(r => (
+                    <tr key={r.id} className="hover:bg-slate-50 transition">
+                      <td className="py-3 px-5 font-mono font-bold text-slate-900">{r.receiptNo}</td>
+                      <td className="py-3 px-5">{r.date}</td>
+                      <td className="py-3 px-5 font-bold text-slate-900">{r.donorName}</td>
+                      <td className="py-3 px-5">{r.mobile}</td>
+                      <td className="py-3 px-5">{r.purpose}</td>
+                      <td className="py-3 px-5 font-extrabold text-slate-900">₹{r.amount.toLocaleString()}</td>
+                      <td className="py-3 px-5 text-right space-x-2">
+                        <button 
+                          onClick={() => onViewReceipt(r)}
+                          className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold"
+                        >
+                          View PDF
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // SECTION 2 & 5: DONATION RECEIPTS (INDIAN FY HIERARCHY + AUDIT TRAIL)
+    // =========================================================================
+    function SectionDonationReceipts({
+      receipts,
+      setReceipts,
+      selectedFY,
+      setSelectedFY,
+      selectedMonth,
+      setSelectedMonth,
+      selectedDate,
+      setSelectedDate,
+      globalSearch,
+      onViewReceipt,
+      onOpenCreateReceipt,
+      onOpenActivities,
+      notify
+    }) {
+
+      // Extract unique dates for the selected Month & FY
+      const datesInMonth = useMemo(() => {
+        const matching = receipts.filter(r => r.financialYear === selectedFY && r.month === selectedMonth);
+        const unique = Array.from(new Set(matching.map(r => r.date))).sort().reverse();
+        return unique;
+      }, [receipts, selectedFY, selectedMonth]);
+
+      // Filtered records
+      const displayReceipts = useMemo(() => {
+        return receipts.filter(r => {
+          if (globalSearch.trim()) {
+            const q = globalSearch.toLowerCase();
+            return (
+              r.receiptNo.toLowerCase().includes(q) ||
+              r.donorName.toLowerCase().includes(q) ||
+              (r.mobile && r.mobile.includes(q)) ||
+              (r.pan && r.pan.toLowerCase().includes(q)) ||
+              (r.purpose && r.purpose.toLowerCase().includes(q))
+            );
+          }
+          if (selectedDate) return r.financialYear === selectedFY && r.date === selectedDate;
+          return r.financialYear === selectedFY && r.month === selectedMonth;
+        });
+      }, [receipts, selectedFY, selectedMonth, selectedDate, globalSearch]);
+
+      const handleCancelReceipt = (receiptId) => {
+        const reason = prompt("Enter official cancellation reason for audit records:");
+        if (!reason) return;
+        setReceipts(receipts.map(r => r.id === receiptId ? { ...r, status: 'Cancelled', cancelReason: reason } : r));
+        notify("Receipt cancelled and retained in audit history.", "error");
+      };
+
+      return (
+        <div className="space-y-6">
+          
+          {/* Header & Controls */}
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-extrabold text-slate-900">Donation Receipts Register</h2>
+              <p className="text-xs text-slate-500">
+                Organised: Financial Year ({selectedFY}) → Month ({selectedMonth}) {selectedDate && `→ Date (${selectedDate})`}
+              </p>
+            </div>
+            <button
+              onClick={onOpenCreateReceipt}
+              className="bg-[#E22D4E] hover:bg-[#c92040] text-white font-extrabold text-xs px-5 py-3 rounded-2xl shadow-lg transition flex items-center gap-2 self-start md:self-auto"
+            >
+              <span>➕</span>
+              <span>Create Donation Receipt</span>
+            </button>
+          </div>
+
+          {/* Month Selector Pills (April - March) */}
+          <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm overflow-x-auto flex items-center gap-1.5">
+            {FY_MONTHS.map(m => {
+              const count = receipts.filter(r => r.financialYear === selectedFY && r.month === m).length;
+              return (
+                <button
+                  key={m}
+                  onClick={() => { setSelectedMonth(m); setSelectedDate(""); }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold shrink-0 transition flex items-center gap-1.5 ${
+                    selectedMonth === m 
+                      ? 'bg-[#10141E] text-white shadow' 
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>{m}</span>
+                  {count > 0 && (
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${selectedMonth === m ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Date Selector Pills (Chronological) */}
+          {datesInMonth.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto text-xs py-1">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Filter Date:</span>
+              <button
+                onClick={() => setSelectedDate("")}
+                className={`px-3 py-1.5 rounded-lg font-bold shrink-0 text-xs ${
+                  !selectedDate ? 'bg-slate-900 text-white' : 'bg-white border text-slate-600'
+                }`}
+              >
+                All Dates in {selectedMonth}
+              </button>
+              {datesInMonth.map(d => (
+                <button
+                  key={d}
+                  onClick={() => setSelectedDate(d)}
+                  className={`px-3 py-1.5 rounded-lg font-bold shrink-0 text-xs ${
+                    selectedDate === d ? 'bg-[#E22D4E] text-white' : 'bg-white border text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Clean Receipt List Table (Section 5) */}
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <span className="text-xs font-extrabold text-slate-800">
+                Displaying {displayReceipts.length} Donation Receipts
+              </span>
+              <span className="text-xs text-slate-500">
+                Total Collection: <strong className="text-slate-900">₹{displayReceipts.reduce((a,c) => a + (c.status !== 'Cancelled' ? Number(c.amount) : 0), 0).toLocaleString()}</strong>
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold tracking-wider">
+                  <tr>
+                    <th className="py-3 px-4">S.No.</th>
+                    <th className="py-3 px-4">Receipt No.</th>
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4">Donor Name</th>
+                    <th className="py-3 px-4">Mobile</th>
+                    <th className="py-3 px-4">Purpose</th>
+                    <th className="py-3 px-4">Mode</th>
+                    <th className="py-3 px-4">Amount</th>
+                    <th className="py-3 px-4 text-center">Activities</th>
+                    <th className="py-3 px-4 text-right">Receipt Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {displayReceipts.length === 0 ? (
+                    <tr>
+                      <td colSpan="10" className="py-12 text-center text-slate-400">
+                        No receipts found for this selection. Click <strong>"Create Donation Receipt"</strong> to add an entry.
+                      </td>
+                    </tr>
+                  ) : (
+                    displayReceipts.map((r, idx) => {
+                      const isCancelled = r.status === 'Cancelled';
+                      const actCount = (r.activities || []).length;
+                      const actUtilised = (r.activities || []).reduce((a,c) => a + Number(c.amountUtilised || 0), 0);
+
+                      return (
+                        <tr key={r.id} className={`hover:bg-slate-50/80 transition ${isCancelled ? 'bg-rose-50/30' : ''}`}>
+                          <td className="py-3.5 px-4 font-bold text-slate-400">{idx + 1}</td>
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
+                            {r.receiptNo}
+                            {isCancelled && <span className="ml-1.5 text-[10px] bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded">Cancelled</span>}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600">{r.date}</td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-900">{r.donorName}</div>
+                            {r.pan && <div className="text-[10px] text-slate-400">PAN: {r.pan}</div>}
+                          </td>
+                          <td className="py-3.5 px-4">{r.mobile}</td>
+                          <td className="py-3.5 px-4 text-slate-700">{r.purpose}</td>
+                          <td className="py-3.5 px-4">{r.paymentMode}</td>
+                          <td className="py-3.5 px-4 font-extrabold text-slate-900">₹{r.amount.toLocaleString()}</td>
+                          
+                          {/* Activities Button directly linked to each receipt */}
+                          <td className="py-3.5 px-4 text-center">
+                            <button
+                              onClick={() => onOpenActivities(r)}
+                              className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-bold border border-amber-200 transition inline-flex items-center gap-1"
+                              title="Manage activities and bills for this donation"
+                            >
+                              <span>🎯 Activities</span>
+                              {actCount > 0 && <span className="bg-amber-600 text-white rounded-full px-1.5 text-[9px]">{actCount}</span>}
+                            </button>
+                            {actCount > 0 && (
+                              <div className="text-[9px] text-slate-400 mt-0.5">₹{actUtilised.toLocaleString()} spent</div>
+                            )}
+                          </td>
+
+                          {/* Action Options */}
+                          <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                            <button
+                              onClick={() => onViewReceipt(r)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px]"
+                              title="View & Download PDF"
+                            >
+                              View PDF
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                const msg = `Dear ${r.donorName}, thank you for your generous contribution of Rs. ${r.amount} to Save The People Charitable Trust. Receipt No: ${r.receiptNo}. Download your 80G Tax Exemption Receipt.`;
+                                window.open(`https://wa.me/${r.mobile.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+                              }}
+                              className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[#00A859] font-bold text-[11px]"
+                              title="Share on WhatsApp"
+                            >
+                              WhatsApp
+                            </button>
+
+                            {r.email && (
+                              <button
+                                onClick={() => {
+                                  alert(`Official Receipt Email with attached PDF queued for: ${r.email}\nSubject: Donation Receipt – SAVE THE PEOPLE CHARITABLE TRUST`);
+                                  notify(`Receipt sent to ${r.email}`);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px]"
+                                title="Send Email"
+                              >
+                                Email
+                              </button>
+                            )}
+
+                            {!isCancelled && (
+                              <button
+                                onClick={() => handleCancelReceipt(r.id)}
+                                className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-[11px]"
+                                title="Cancel receipt (keeps in audit log)"
+                              >
+                                Cancel
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // SECTION 7: ACTIVITIES (RECEIPT-LINKED + BILLS / PHOTO EVIDENCE)
+    // =========================================================================
+    function ReceiptActivityModal({ receipt, onClose, onAddActivity }) {
+      const [isAdding, setIsAdding] = useState(false);
+      const [actDate, setActDate] = useState(new Date().toISOString().slice(0, 10));
+      const [actName, setActName] = useState('');
+      const [actCategory, setActCategory] = useState(ACTIVITY_CATEGORIES[0]);
+      const [actDesc, setActDesc] = useState('');
+      const [actAmount, setActAmount] = useState('');
+      const [beneficiary, setBeneficiary] = useState('');
+      const [uploadedFiles, setUploadedFiles] = useState([]);
+
+      const activities = receipt.activities || [];
+      const totalDonation = Number(receipt.amount || 0);
+      const totalUtilised = activities.reduce((a,c) => a + Number(c.amountUtilised || 0), 0);
+      const remainingAmount = totalDonation - totalUtilised;
+
+      const handleSave = (e) => {
+        e.preventDefault();
+        const amt = Number(actAmount);
+        if (!amt || isNaN(amt)) {
+          alert('Please enter a valid utilized amount.');
+          return;
+        }
+
+        const newAct = {
+          id: `ACT-${Date.now()}`,
+          date: actDate,
+          name: actName,
+          category: actCategory,
+          note: actDesc,
+          amountUtilised: amt,
+          beneficiary: beneficiary || 'Confidential Beneficiary',
+          files: uploadedFiles.length > 0 ? uploadedFiles : ['support_bill_1.pdf']
+        };
+
+        onAddActivity(newAct);
+        setIsAdding(false);
+        setActName('');
+        setActDesc('');
+        setActAmount('');
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl p-6 space-y-6">
+            
+            {/* Header */}
+            <div className="flex justify-between items-start border-b border-slate-100 pb-4">
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600 bg-rose-50 px-2.5 py-1 rounded-full">
+                  Receipt-Linked Activities
+                </span>
+                <h3 className="text-xl font-extrabold text-slate-900 mt-1">
+                  Activities for Receipt: {receipt.receiptNo}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Donor: <strong>{receipt.donorName}</strong> • Purpose: <strong>{receipt.purpose}</strong>
+                </p>
+              </div>
+              <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-lg">✕</button>
+            </div>
+
+            {/* Fund Balance Banner */}
+            <div className="grid grid-cols-3 gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-100 text-center">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-slate-400">Total Donation</span>
+                <p className="text-lg font-extrabold text-slate-900">₹{totalDonation.toLocaleString()}</p>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-slate-400">Total Utilised</span>
+                <p className="text-lg font-extrabold text-[#E22D4E]">₹{totalUtilised.toLocaleString()}</p>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-slate-400">Remaining Balance</span>
+                <p className="text-lg font-extrabold text-[#00A859]">₹{remainingAmount.toLocaleString()}</p>
+              </div>
+            </div>
+
+            {/* Add Activity Button or Form */}
+            {!isAdding ? (
+              <div className="flex justify-between items-center">
+                <h4 className="font-extrabold text-sm text-slate-800">Linked Expenditures & Ground Proofs</h4>
+                <button
+                  onClick={() => setIsAdding(true)}
+                  className="bg-[#E22D4E] hover:bg-[#c92040] text-white font-bold text-xs px-4 py-2 rounded-xl transition"
+                >
+                  + Add Activity to this Donation
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSave} className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+                <h4 className="font-bold text-xs uppercase tracking-wider text-slate-900">New Ground Activity & Proof Entry</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Activity Date *</label>
+                    <input required type="date" value={actDate} onChange={e => setActDate(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Category *</label>
+                    <select value={actCategory} onChange={e => setActCategory(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold">
+                      {ACTIVITY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Amount Utilised (₹) *</label>
+                    <input required type="number" placeholder="e.g. 1500" value={actAmount} onChange={e => setActAmount(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Activity Name / Subject *</label>
+                    <input required type="text" placeholder="e.g. School Books & Bag Kit" value={actName} onChange={e => setActName(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Beneficiary Name (Optional)</label>
+                    <input type="text" placeholder="e.g. Ananya & 2 Others" value={beneficiary} onChange={e => setBeneficiary(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Short Activity Note / Report *</label>
+                  <textarea required rows="2" placeholder="Describe how the donation was utilized on the ground..." value={actDesc} onChange={e => setActDesc(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"></textarea>
+                </div>
+
+                {/* File / Photo Upload Mock */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Upload Bill / Photos / Evidence (Camera / File)</label>
+                  <input 
+                    type="file" 
+                    multiple 
+                    onChange={e => {
+                      const names = Array.from(e.target.files).map(f => f.name);
+                      setUploadedFiles(names);
+                    }}
+                    className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#10141E] file:text-white hover:file:bg-[#E22D4E]" 
+                  />
+                  {uploadedFiles.length > 0 && (
+                    <p className="text-[10px] text-emerald-600 font-bold mt-1">✓ {uploadedFiles.join(', ')}</p>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200">
+                    Cancel
+                  </button>
+                  <button type="submit" className="bg-[#E22D4E] hover:bg-[#c92040] text-white font-bold text-xs px-5 py-2 rounded-xl">
+                    Save Activity
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* List of Activities for this receipt */}
+            <div className="space-y-3">
+              {activities.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-2xl text-xs">
+                  No activities linked to this donation receipt yet. Click "+ Add Activity to this Donation" above.
+                </div>
+              ) : (
+                activities.map(a => (
+                  <div key={a.id} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm flex flex-col md:flex-row justify-between gap-3 items-start md:items-center">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">{a.date}</span>
+                        <span className="text-xs font-extrabold text-slate-900">{a.name}</span>
+                        <span className="text-[10px] text-rose-600 font-bold">({a.category})</span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1">{a.note}</p>
+                      <div className="text-[10px] text-slate-400 mt-1">
+                        Beneficiary: <strong className="text-slate-700">{a.beneficiary || 'Verified Beneficiary'}</strong> • 
+                        Documents: <span className="text-blue-600">{(a.files || []).join(', ')}</span>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-sm font-extrabold text-[#E22D4E]">₹{a.amountUtilised.toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // SECTION 8: ACTIVITIES - MAIN OVERVIEW MENU
+    // =========================================================================
+    function SectionActivitiesMain({ receipts, selectedFY }) {
+      const allActivities = useMemo(() => {
+        let list = [];
+        receipts.forEach(r => {
+          (r.activities || []).forEach(a => {
+            list.push({ ...a, receiptNo: r.receiptNo, donorName: r.donorName, financialYear: r.financialYear });
+          });
+        });
+        return list.filter(a => a.financialYear === selectedFY);
+      }, [receipts, selectedFY]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-extrabold text-slate-900">All Field Activities & Proofs</h2>
+              <p className="text-xs text-slate-500">Cross-donation expenditure reports and photographic evidence (FY {selectedFY})</p>
+            </div>
+            <div className="text-right">
+              <span className="text-xs text-slate-400 font-bold">Total Ground Deployment</span>
+              <p className="text-xl font-extrabold text-[#E22D4E]">
+                ₹{allActivities.reduce((a,c) => a + Number(c.amountUtilised || 0), 0).toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold tracking-wider">
+                  <tr>
+                    <th className="py-3 px-5">Date</th>
+                    <th className="py-3 px-5">Activity Name</th>
+                    <th className="py-3 px-5">Category</th>
+                    <th className="py-3 px-5">Related Receipt</th>
+                    <th className="py-3 px-5">Donor Earmark</th>
+                    <th className="py-3 px-5">Beneficiary Info</th>
+                    <th className="py-3 px-5">Amount Utilised</th>
+                    <th className="py-3 px-5">Evidence Docs</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {allActivities.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="py-12 text-center text-slate-400">
+                        No activities logged for this financial year yet. Open any donation receipt to link an activity.
+                      </td>
+                    </tr>
+                  ) : (
+                    allActivities.map((a, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50 transition">
+                        <td className="py-3 px-5 font-mono text-slate-700">{a.date}</td>
+                        <td className="py-3 px-5">
+                          <div className="font-bold text-slate-900">{a.name}</div>
+                          <div className="text-[11px] text-slate-500">{a.note}</div>
+                        </td>
+                        <td className="py-3 px-5 font-bold text-rose-600">{a.category}</td>
+                        <td className="py-3 px-5 font-mono text-blue-600 font-bold">{a.receiptNo}</td>
+                        <td className="py-3 px-5">{a.donorName}</td>
+                        <td className="py-3 px-5">{a.beneficiary}</td>
+                        <td className="py-3 px-5 font-extrabold text-slate-900">₹{a.amountUtilised.toLocaleString()}</td>
+                        <td className="py-3 px-5">
+                          <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[10px] font-bold">
+                            {(a.files || []).length} Verified Files
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // SECTION 9 & 10: BANK STATEMENTS MANAGEMENT & RECONCILIATION
+    // =========================================================================
+    function SectionBankStatements({
+      bankAccounts,
+      setBankAccounts,
+      bankTransactions,
+      setBankTransactions,
+      receipts,
+      selectedFY,
+      notify
+    }) {
+      const [isAddingTxn, setIsAddingTxn] = useState(false);
+      const [txnDate, setTxnDate] = useState(new Date().toISOString().slice(0, 10));
+      const [txnDesc, setTxnDesc] = useState('');
+      const [txnRef, setTxnRef] = useState('');
+      const [txnCredit, setTxnCredit] = useState('');
+      const [txnDebit, setTxnDebit] = useState('');
+
+      const handleAddTxn = (e) => {
+        e.preventDefault();
+        const credit = Number(txnCredit || 0);
+        const debit = Number(txnDebit || 0);
+
+        // Check if there is a matching receipt automatically
+        const matched = receipts.find(r => r.amount === credit && (r.refNo === txnRef || r.paymentMode === 'UPI' || r.paymentMode === 'Bank Transfer'));
+
+        const newT = {
+          id: `TXN-${Date.now()}`,
+          date: txnDate,
+          desc: txnDesc,
+          ref: txnRef,
+          credit,
+          debit,
+          balance: 145000 + credit - debit,
+          matchStatus: matched ? "Matched" : "Pending Verification",
+          receiptNo: matched ? matched.receiptNo : ""
+        };
+
+        setBankTransactions([newT, ...bankTransactions]);
+        setIsAddingTxn(false);
+        setTxnDesc('');
+        setTxnRef('');
+        setTxnCredit('');
+        setTxnDebit('');
+        notify("Bank statement transaction recorded and reconciled!");
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h2 className="text-xl font-extrabold text-slate-900">Bank Statement Reconciliation</h2>
+              <p className="text-xs text-slate-500">Auto-match bank credits with donation receipts to avoid duplicate income.</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsAddingTxn(true)}
+                className="bg-[#10141E] hover:bg-[#E22D4E] text-white font-bold text-xs px-4 py-2.5 rounded-xl transition"
+              >
+                + Manual Bank Entry
+              </button>
+            </div>
+          </div>
+
+          {/* Bank Accounts Grid */}
+          <div className="grid md:grid-cols-2 gap-4">
+            {bankAccounts.map(b => (
+              <div key={b.id} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900">{b.bankName}</h3>
+                    <p className="text-xs text-slate-400">A/C: {b.accountNo} • IFSC: {b.ifsc}</p>
+                  </div>
+                  <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{b.type}</span>
+                </div>
+                <div className="pt-2 flex justify-between items-end border-t border-slate-100">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase">Current Book Balance</span>
+                    <p className="text-lg font-extrabold text-slate-900">₹{b.currentBalance.toLocaleString()}</p>
+                  </div>
+                  <span className="text-xs text-[#00A859] font-bold">✓ Active</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Manual Entry Form */}
+          {isAddingTxn && (
+            <form onSubmit={handleAddTxn} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <h3 className="font-bold text-xs uppercase text-slate-900">Enter Statement Transaction</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Date</label>
+                  <input required type="date" value={txnDate} onChange={e => setTxnDate(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">UTR / Ref No</label>
+                  <input required type="text" placeholder="e.g. UTR/902188" value={txnRef} onChange={e => setTxnRef(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Credit Amount (₹)</label>
+                  <input type="number" placeholder="5000" value={txnCredit} onChange={e => setTxnCredit(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs font-bold text-emerald-600" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Debit Amount (₹)</label>
+                  <input type="number" placeholder="0" value={txnDebit} onChange={e => setTxnDebit(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs font-bold text-rose-600" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Particulars / Description</label>
+                <input required type="text" placeholder="e.g. UPI/Priya Sharma/Donation" value={txnDesc} onChange={e => setTxnDesc(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs" />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setIsAddingTxn(false)} className="px-4 py-2 text-xs font-bold text-slate-500">Cancel</button>
+                <button type="submit" className="bg-[#E22D4E] text-white px-5 py-2 rounded-xl text-xs font-bold">Save Transaction</button>
+              </div>
+            </form>
+          )}
+
+          {/* Statement Reconciliation Table */}
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <span className="text-xs font-bold text-slate-800">Verified Bank Ledger Records</span>
+              <button 
+                onClick={() => {
+                  const csv = "Date,Description,UTR,Credit,Debit,Status\n" + bankTransactions.map(t => `${t.date},"${t.desc}",${t.ref},${t.credit},${t.debit},${t.matchStatus}`).join('\n');
+                  const blob = new Blob([csv], { type: 'text/csv' });
+                  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'bank_statement.csv'; a.click();
+                }}
+                className="text-xs font-bold text-[#E22D4E] hover:underline"
+              >
+                Download Statement (CSV) ↓
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold tracking-wider">
+                  <tr>
+                    <th className="py-3 px-5">Date</th>
+                    <th className="py-3 px-5">Description</th>
+                    <th className="py-3 px-5">UTR / Reference</th>
+                    <th className="py-3 px-5">Credit</th>
+                    <th className="py-3 px-5">Debit</th>
+                    <th className="py-3 px-5">Matching Status</th>
+                    <th className="py-3 px-5">Linked Receipt</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {bankTransactions.map(t => (
+                    <tr key={t.id} className="hover:bg-slate-50 transition">
+                      <td className="py-3 px-5 font-mono text-slate-700">{t.date}</td>
+                      <td className="py-3 px-5 font-bold text-slate-800">{t.desc}</td>
+                      <td className="py-3 px-5 font-mono text-slate-500">{t.ref}</td>
+                      <td className="py-3 px-5 font-extrabold text-[#00A859]">
+                        {t.credit > 0 ? `₹${t.credit.toLocaleString()}` : '—'}
+                      </td>
+                      <td className="py-3 px-5 font-extrabold text-rose-600">
+                        {t.debit > 0 ? `₹${t.debit.toLocaleString()}` : '—'}
+                      </td>
+                      <td className="py-3 px-5">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          t.matchStatus === 'Matched' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {t.matchStatus}
+                        </span>
+                      </td>
+                      <td className="py-3 px-5 font-mono text-xs font-bold text-blue-600">
+                        {t.receiptNo || 'Unassigned'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // SECTION 11 & 12: FINANCIAL REPORTS (CONSOLIDATED MONTHLY & YEARLY)
+    // =========================================================================
+    function SectionFinancialReports({ receipts, bankAccounts, bankTransactions, selectedFY, selectedMonth, setSelectedMonth, orgSettings, notify }) {
+      const monthReceipts = receipts.filter(r => r.financialYear === selectedFY && r.month === selectedMonth && r.status !== 'Cancelled');
+      const totalMonthDonations = monthReceipts.reduce((a,c) => a + Number(c.amount || 0), 0);
+      
+      let monthActivities = [];
+      monthReceipts.forEach(r => {
+        (r.activities || []).forEach(a => monthActivities.push({ ...a, receiptNo: r.receiptNo, donorName: r.donorName }));
+      });
+      const totalMonthUtilised = monthActivities.reduce((a,c) => a + Number(c.amountUtilised || 0), 0);
+
+      const downloadConsolidatedExcel = (isFullYear = false) => {
+        const title = isFullYear ? `Full_FY_${selectedFY}_Consolidated_Report` : `Monthly_Report_${selectedMonth}_${selectedFY}`;
+        const lines = [
+          `SAVE THE PEOPLE CHARITABLE TRUST - CONSOLIDATED AUDIT REPORT (${title})`,
+          `Registration: ${orgSettings.regNo} | PAN: ${orgSettings.orgPan} | 80G: ${orgSettings.section80G}`,
+          `Generated On: ${new Date().toLocaleString()}`,
+          "",
+          "PART 1: DONATION RECEIPTS REGISTER",
+          "Receipt No,Date,Donor Name,Mobile,PAN,Purpose,Payment Mode,Amount",
+          ...receipts.filter(r => isFullYear ? r.financialYear === selectedFY : (r.financialYear === selectedFY && r.month === selectedMonth))
+                     .map(r => `"${r.receiptNo}","${r.date}","${r.donorName}","${r.mobile}","${r.pan || ''}","${r.purpose}","${r.paymentMode}",${r.amount}`),
+          "",
+          "PART 2: GROUND ACTIVITIES & UTILISATION",
+          "Date,Activity Name,Category,Receipt No,Donor Name,Beneficiary,Amount Utilised,Documents",
+          ...monthActivities.map(a => `"${a.date}","${a.name}","${a.category}","${a.receiptNo}","${a.donorName}","${a.beneficiary}",${a.amountUtilised},"${(a.files||[]).join(';')}"`),
+          "",
+          "PART 3: FINANCIAL RECONCILIATION SUMMARY",
+          `Total Donations Received,Rs. ${totalMonthDonations}`,
+          `Total Amount Utilised,Rs. ${totalMonthUtilised}`,
+          `Remaining Balance,Rs. ${totalMonthDonations - totalMonthUtilised}`
+        ];
+
+        const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${title}.csv`;
+        a.click();
+        notify(`Consolidated ${title} downloaded successfully!`);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h2 className="text-xl font-extrabold text-slate-900">Comprehensive Audit Reports</h2>
+              <p className="text-xs text-slate-500">7-Part consolidated registers containing Receipts, Activities, Proofs, and Bank Summaries</p>
+            </div>
+            
+            <div className="flex gap-2">
+              <button
+                onClick={() => downloadConsolidatedExcel(false)}
+                className="bg-[#E22D4E] hover:bg-[#c92040] text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition"
+              >
+                Download Monthly Report ({selectedMonth})
+              </button>
+              <button
+                onClick={() => downloadConsolidatedExcel(true)}
+                className="bg-[#10141E] hover:bg-black text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition"
+              >
+                Download Overall FY ({selectedFY}) Report
+              </button>
+            </div>
+          </div>
+
+          {/* Month Selector for Reports */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center gap-2 overflow-x-auto text-xs">
+            <span className="font-bold text-slate-400 uppercase text-[10px] shrink-0">Select Month:</span>
+            {FY_MONTHS.map(m => (
+              <button
+                key={m}
+                onClick={() => setSelectedMonth(m)}
+                className={`px-3 py-1.5 rounded-lg font-bold shrink-0 text-xs ${
+                  selectedMonth === m ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+
+          {/* 7-PART REPORT PREVIEW CARDS */}
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
+              <span className="text-[10px] font-bold uppercase text-slate-400">PART 1: DONATIONS SUMMARY</span>
+              <p className="text-xl font-extrabold text-slate-900">₹{totalMonthDonations.toLocaleString()}</p>
+              <p className="text-xs text-slate-500">{monthReceipts.length} Donors for {selectedMonth} {selectedFY}</p>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
+              <span className="text-[10px] font-bold uppercase text-slate-400">PART 2 & 3: ACTIVITIES DEPLOYED</span>
+              <p className="text-xl font-extrabold text-[#E22D4E]">₹{totalMonthUtilised.toLocaleString()}</p>
+              <p className="text-xs text-slate-500">{monthActivities.length} Field Activities Logged</p>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
+              <span className="text-[10px] font-bold uppercase text-slate-400">PART 5: NET SURPLUS / BALANCE</span>
+              <p className="text-xl font-extrabold text-[#00A859]">₹{(totalMonthDonations - totalMonthUtilised).toLocaleString()}</p>
+              <p className="text-xs text-slate-500">100% Retained in Trust Accounts</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // SECTION 15: RECEIPT & ORGANISATION SETTINGS
+    // =========================================================================
+    function SectionSettings({ orgSettings, setOrgSettings, notify }) {
+      const [form, setForm] = useState(orgSettings);
+
+      const handleSave = (e) => {
+        e.preventDefault();
+        setOrgSettings(form);
+        notify("Organisation & 80G receipt settings saved successfully!");
+      };
+
+      return (
+        <form onSubmit={handleSave} className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6 max-w-4xl">
+          <div>
+            <h2 className="text-xl font-extrabold text-slate-900">Organisation & 80G Settings</h2>
+            <p className="text-xs text-slate-500">Maintains permanent legal Trust particulars rendered on all generated donation receipts.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold">
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Organisation Legal Name</label>
+              <input type="text" value={form.orgName} onChange={e => setForm({ ...form, orgName: e.target.value })} className="w-full bg-slate-50 border rounded-xl px-3.5 py-2.5" />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Registration Number</label>
+              <input type="text" value={form.regNo} onChange={e => setForm({ ...form, regNo: e.target.value })} className="w-full bg-slate-50 border rounded-xl px-3.5 py-2.5" />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Trust PAN Number</label>
+              <input type="text" value={form.orgPan} onChange={e => setForm({ ...form, orgPan: e.target.value })} className="w-full bg-slate-50 border rounded-xl px-3.5 py-2.5 uppercase" />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Section 80G Order Number</label>
+              <input type="text" value={form.section80G} onChange={e => setForm({ ...form, section80G: e.target.value })} className="w-full bg-slate-50 border rounded-xl px-3.5 py-2.5" />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Section 12A / 12AB Details</label>
+              <input type="text" value={form.section12A} onChange={e => setForm({ ...form, section12A: e.target.value })} className="w-full bg-slate-50 border rounded-xl px-3.5 py-2.5" />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Managing Trustee Name</label>
+              <input type="text" value={form.trusteeName} onChange={e => setForm({ ...form, trusteeName: e.target.value })} className="w-full bg-slate-50 border rounded-xl px-3.5 py-2.5" />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Receipt Number Prefix</label>
+              <input type="text" value={form.receiptPrefix} onChange={e => setForm({ ...form, receiptPrefix: e.target.value })} className="w-full bg-slate-50 border rounded-xl px-3.5 py-2.5" />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Official Contact Phone</label>
+              <input type="text" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="w-full bg-slate-50 border rounded-xl px-3.5 py-2.5" />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Registered Trust Address</label>
+              <input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="w-full bg-slate-50 border rounded-xl px-3.5 py-2.5" />
+            </div>
+          </div>
+
+          <button type="submit" className="bg-[#E22D4E] hover:bg-[#c92040] text-white font-extrabold text-xs px-6 py-3 rounded-full shadow transition">
+            Save Organization Settings
+          </button>
+        </form>
+      );
+    }
+
+    // =========================================================================
+    // SECTION 3 & 4: CREATE DONATION RECEIPT ENTRY MODAL
+    // =========================================================================
+    function CreateReceiptModal({ orgSettings, receipts, onClose, onSave }) {
+      const today = new Date().toISOString().slice(0, 10);
+      const [receiptDate, setReceiptDate] = useState(today);
+      const [donorName, setDonorName] = useState('');
+      const [mobile, setMobile] = useState('');
+      const [email, setEmail] = useState('');
+      const [pan, setPan] = useState('');
+      const [address, setAddress] = useState('');
+      const [amount, setAmount] = useState('');
+      const [purpose, setPurpose] = useState('General Donation');
+      const [otherPurpose, setOtherPurpose] = useState('');
+      const [paymentMode, setPaymentMode] = useState('UPI');
+      const [refNo, setRefNo] = useState('');
+
+      // Auto generate sequential receipt number
+      const nextReceiptNumber = useMemo(() => {
+        const count = receipts.length + 1;
+        const padded = String(count).padStart(6, '0');
+        return `${orgSettings.receiptPrefix}/${orgSettings.currentFY}/${padded}`;
+      }, [receipts, orgSettings]);
+
+      const amountWords = useMemo(() => {
+        return numberToWordsINR(Number(amount));
+      }, [amount]);
+
+      const handleSubmit = (createNext = false) => {
+        if (!donorName || !mobile || !amount) {
+          alert('Please fill all mandatory fields (Donor Name, Mobile, Amount).');
+          return;
+        }
+
+        const dateObj = new Date(receiptDate);
+        const monthName = FY_MONTHS[dateObj.getMonth() >= 3 ? dateObj.getMonth() - 3 : dateObj.getMonth() + 9];
+
+        const newRec = {
+          id: `REC-${Date.now()}`,
+          receiptNo: nextReceiptNumber,
+          date: receiptDate,
+          financialYear: orgSettings.currentFY,
+          month: monthName,
+          donorName,
+          mobile,
+          email,
+          pan: pan ? pan.toUpperCase() : '',
+          address,
+          amount: Number(amount),
+          amountInWords: amountWords,
+          purpose: purpose === 'Other' ? otherPurpose : purpose,
+          paymentMode,
+          refNo: refNo || `${paymentMode}-VERIFIED`,
+          status: 'Completed',
+          activities: []
+        };
+
+        onSave(newRec, createNext);
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-5">
+            
+            {/* Header */}
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-2 py-0.5 rounded">
+                  Auto Sequence No: {nextReceiptNumber}
+                </span>
+                <h3 className="text-lg font-extrabold text-slate-900 mt-1">Donation Receipt Entry</h3>
+              </div>
+              <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-lg">✕</button>
+            </div>
+
+            <form onSubmit={e => { e.preventDefault(); handleSubmit(false); }} className="space-y-4 text-xs font-semibold">
+              
+              {/* Part A & Date */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Receipt Date *</label>
+                  <input required type="date" value={receiptDate} onChange={e => setReceiptDate(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs font-bold" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Financial Year (Auto)</label>
+                  <input disabled type="text" value={orgSettings.currentFY} className="w-full bg-slate-100 border rounded-xl px-3 py-2 text-xs font-bold text-slate-500" />
+                </div>
+              </div>
+
+              {/* Part B: Donor Info */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <span className="text-[10px] font-extrabold uppercase text-slate-400">Donor Particulars</span>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Received With Thanks From (Donor Name) *</label>
+                    <input required type="text" placeholder="e.g. Ramesh Kumar" value={donorName} onChange={e => setDonorName(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Mobile Number *</label>
+                    <input required type="tel" placeholder="+91 98765 43210" value={mobile} onChange={e => setMobile(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Donor PAN Number (Optional - for 80G)</label>
+                    <input type="text" placeholder="ABCDE1234F" maxLength={10} value={pan} onChange={e => setPan(e.target.value.toUpperCase())} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs uppercase" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Email ID (For Auto PDF Delivery)</label>
+                    <input type="email" placeholder="ramesh@example.com" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Address (Optional)</label>
+                  <input type="text" placeholder="Residential / Org Address" value={address} onChange={e => setAddress(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs" />
+                </div>
+              </div>
+
+              {/* Part C & D: Donation Amount & Payment */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <span className="text-[10px] font-extrabold uppercase text-slate-400">Donation & Payment Details</span>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Donation Amount (₹) *</label>
+                    <input required type="number" placeholder="e.g. 5000" value={amount} onChange={e => setAmount(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-sm font-extrabold text-[#E22D4E]" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Donation Purpose *</label>
+                    <select value={purpose} onChange={e => setPurpose(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs">
+                      {DONATION_PURPOSES.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Amount in words preview */}
+                <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 italic">
+                  <strong>Amount in Words:</strong> {amountWords}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Payment Mode *</label>
+                    <select value={paymentMode} onChange={e => setPaymentMode(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs font-bold">
+                      <option value="UPI">UPI (GPay / PhonePe / QR)</option>
+                      <option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option>
+                      <option value="Cash">Cash</option>
+                      <option value="Cheque">Cheque / Demand Draft</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Transaction Ref / Cheque No</label>
+                    <input type="text" placeholder="e.g. UTR / UPI Ref ID" value={refNo} onChange={e => setRefNo(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t border-slate-100">
+                <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100">
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => handleSubmit(true)}
+                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow transition"
+                >
+                  Save & Create Next
+                </button>
+                <button 
+                  type="submit" 
+                  className="bg-[#E22D4E] hover:bg-[#c92040] text-white font-extrabold text-xs px-6 py-2.5 rounded-xl shadow-lg transition"
+                >
+                  Save & Generate PDF
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // SECTION 6: INDIVIDUAL DONATION RECEIPT VIEW & PDF PRINTABLE MODAL
+    // =========================================================================
+    function ReceiptViewModal({ receipt, orgSettings, onClose, notify }) {
+      return (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden space-y-4">
+            
+            {/* Action Bar */}
+            <div className="bg-[#10141E] p-4 text-white flex justify-between items-center">
+              <span className="font-extrabold text-xs tracking-wider text-rose-400">
+                OFFICIAL 80G DONATION RECEIPT
+              </span>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => window.print()}
+                  className="bg-[#E22D4E] text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow"
+                >
+                  🖨️ Print / Save PDF
+                </button>
+                <button onClick={onClose} className="text-slate-400 hover:text-white text-lg px-2">✕</button>
+              </div>
+            </div>
+
+            {/* PRINTABLE RECEIPT TEMPLATE (Follows Section 6 Specs) */}
+            <div id="printable-receipt" className="p-8 space-y-6 text-slate-800 text-xs border border-slate-200 m-6 rounded-2xl bg-white">
+              
+              {/* Header with Trust Details */}
+              <div className="text-center border-b border-slate-300 pb-4 space-y-1">
+                <h1 className="text-xl font-extrabold text-[#E22D4E] tracking-tight">{orgSettings.orgName}</h1>
+                <p className="text-[10px] text-slate-600 font-bold">{orgSettings.address}</p>
+                <p className="text-[10px] text-slate-500">
+                  Reg No: <strong>{orgSettings.regNo}</strong> • PAN: <strong>{orgSettings.orgPan}</strong>
+                </p>
+                <p className="text-[10px] text-slate-700 font-semibold">
+                  80G Order No: <strong>{orgSettings.section80G}</strong> ({orgSettings.section80GValidity}) • 12A: <strong>{orgSettings.section12A}</strong>
+                </p>
+              </div>
+
+              {/* Receipt Metadata */}
+              <div className="flex justify-between items-center text-xs font-bold border-b border-dashed border-slate-200 pb-3">
+                <span>Receipt No: <strong className="font-mono text-slate-900">{receipt.receiptNo}</strong></span>
+                <span>Date: <strong className="text-slate-900">{receipt.date}</strong></span>
+              </div>
+
+              {/* Donor particulars */}
+              <div className="space-y-2.5 text-xs">
+                <p>
+                  Received with thanks from: <strong className="text-slate-900 uppercase font-bold text-sm underline">{receipt.donorName}</strong>
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <p>Donor PAN: <strong>{receipt.pan || 'Not Provided'}</strong></p>
+                  <p>Mobile: <strong>{receipt.mobile}</strong></p>
+                </div>
+                {receipt.address && <p>Address: <strong>{receipt.address}</strong></p>}
+                
+                <p>
+                  The sum of Rupees: <strong className="text-slate-900 font-bold italic">{receipt.amountInWords}</strong>
+                </p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <p>By Payment Mode: <strong className="uppercase">{receipt.paymentMode} ({receipt.refNo})</strong></p>
+                  <p>Donation Purpose: <strong className="text-[#E22D4E] font-bold">{receipt.purpose}</strong></p>
+                </div>
+              </div>
+
+              {/* Highlight Amount Box & Signatures */}
+              <div className="flex justify-between items-end pt-6 border-t border-slate-300">
+                <div className="p-3.5 bg-slate-100 rounded-xl border border-slate-300">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Total Contribution</span>
+                  <span className="text-2xl font-black text-slate-900">₹{receipt.amount.toLocaleString()}/-</span>
+                </div>
+
+                <div className="text-right space-y-1">
+                  <div className="font-serif-heading italic text-sm font-bold text-slate-800">
+                    {orgSettings.trusteeName}
+                  </div>
+                  <div className="border-t border-slate-400 pt-1 text-[10px] text-slate-500 font-bold uppercase">
+                    For {orgSettings.orgName} <br />
+                    ({orgSettings.trusteeDesignation})
+                  </div>
+                </div>
+              </div>
+
+              {/* 80G Legal Disclaimer */}
+              <div className="text-[9px] text-slate-400 text-center pt-3 border-t border-dashed border-slate-200">
+                Donations made to Save The People Charitable Trust are eligible for 50% tax deduction under Section 80G of the Income Tax Act, 1961. This is a computer-generated receipt.
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // PUBLIC LANDING PAGE (CONNECTED TO ADMIN)
+    // =========================================================================
+    function PublicLandingView({ onOpenAdmin }) {
+      return (
+        <div>
+          {/* Header */}
+          <header className="sticky top-0 z-40 bg-white shadow-sm border-b border-slate-100">
+            <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <img 
+                  src="images/save_the_people_logo.jpeg" 
+                  alt="Save The People" 
+                  className="h-14 w-auto object-contain"
+                  onError={e => e.target.style.display = 'none'}
+                />
+              </div>
+
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={onOpenAdmin}
+                  className="text-xs font-extrabold text-slate-800 bg-slate-100 hover:bg-slate-200 px-4 py-2.5 rounded-xl transition flex items-center gap-1.5"
+                >
+                  <span>🛡️</span>
+                  <span>Admin Billing Portal</span>
+                </button>
+                <button 
+                  onClick={() => alert("Please contact admin or scan UPI on the receipt module.")}
+                  className="bg-[#E22D4E] hover:bg-[#c92040] text-white font-extrabold text-xs px-6 py-2.5 rounded-full shadow"
+                >
+                  Donate Now
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* Hero Banner */}
+          <section className="py-24 bg-[#10141E] text-white text-center px-4">
+            <div className="max-w-3xl mx-auto space-y-6">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#E22D4E] bg-rose-500/10 px-4 py-1.5 rounded-full border border-rose-500/20">
+                Save The People Charitable Trust
+              </span>
+              <h1 className="text-4xl sm:text-6xl font-extrabold font-serif-heading leading-tight">
+                Together for humanity, dignity, and real ground impact.
+              </h1>
+              <p className="text-slate-300 text-sm leading-relaxed max-w-xl mx-auto">
+                All donations are registered under Section 80G with complete activity tracing and permanent record maintenance.
+              </p>
+              <div>
+                <button
+                  onClick={onOpenAdmin}
+                  className="bg-[#E22D4E] text-white font-bold text-sm px-8 py-3.5 rounded-full shadow-xl hover:bg-[#c92040] transition"
+                >
+                  Open Trust Billing & Receipts System →
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      );
+    }
+
+    // Global Error Logger and Resilient Error Boundary
+    window.addEventListener('error', function(e) {
+      console.error('Window error captured:', e.error || e.message);
+    });
+
+    class ErrorBoundary extends React.Component {
+      constructor(props) { 
+        super(props); 
+        this.state = { hasError: false, error: null }; 
+      }
+      static getDerivedStateFromError(error) { 
+        return { hasError: true, error }; 
+      }
+      componentDidCatch(error, errorInfo) {
+        console.error("React Component Error:", error, errorInfo);
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="p-8 max-w-lg mx-auto my-12 bg-white rounded-3xl border border-rose-200 shadow-xl text-center space-y-4">
+              <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto text-xl font-bold">⚠️</div>
+              <h2 className="text-base font-extrabold text-slate-900">Application Notice</h2>
+              <p className="text-xs text-slate-500 font-mono bg-slate-50 p-3 rounded-xl border border-slate-100 break-words text-left">
+                {this.state.error?.message || "An unexpected rendering event occurred."}
+              </p>
+              <button 
+                onClick={() => { localStorage.clear(); window.location.reload(); }} 
+                className="bg-[#E22D4E] hover:bg-[#c92040] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow transition"
+              >
+                Clear Local Cache & Reload
+              </button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    );
+  </script>
+</body>
+</html>
