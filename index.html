@@ -14,6 +14,8 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <!-- Babel for JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- SheetJS CDN (Reads Excel .xlsx and .xls directly in browser) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- Razorpay Checkout Script -->
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 
@@ -249,14 +251,52 @@
 
     // --- MAIN REACT APPLICATION ---
     function App() {
-      // Clean view state
-      const isPathAdmin = () => {
+      // Clean view state & sub-section from URL
+      const parseInitialState = () => {
         const path = window.location.pathname.toLowerCase();
-        return path.endsWith('/admin') || window.location.hash === '#admin';
+        const hash = window.location.hash.toLowerCase();
+        const isAdmin = path.startsWith('/admin') || hash.startsWith('#admin');
+        let sub = 'dashboard';
+        if (isAdmin) {
+          if (path.includes('/reports') || hash.includes('reports')) sub = 'reports';
+          else if (path.includes('/receipts') || hash.includes('receipts')) sub = 'receipts';
+          else if (path.includes('/statements') || hash.includes('statements')) sub = 'statements';
+          else if (path.includes('/activities') || hash.includes('activities')) sub = 'activities';
+          else if (path.includes('/settings') || hash.includes('settings')) sub = 'settings';
+        }
+        return { view: isAdmin ? 'admin' : 'public', sub };
       };
 
-      const [view, setViewState] = useState(() => isPathAdmin() ? 'admin' : 'public');
-      const [adminSubSection, setAdminSubSection] = useState('dashboard'); // 'dashboard' | 'receipts' | 'statements' | 'activities' | 'reports' | 'settings'
+      const initialState = parseInitialState();
+      const [view, setViewState] = useState(initialState.view);
+      const [adminSubSection, setAdminSubSectionState] = useState(initialState.sub);
+
+      const changeAdminSection = (sectionId) => {
+        setAdminSubSectionState(sectionId);
+        try {
+          if (window.location.protocol.startsWith('http')) {
+            const pathName = sectionId === 'dashboard' ? '/admin' : `/admin/${sectionId}`;
+            window.history.pushState({}, '', pathName);
+          } else {
+            window.location.hash = sectionId === 'dashboard' ? 'admin' : `admin/${sectionId}`;
+          }
+        } catch(e) {}
+      };
+
+      // Listen for browser forward/back buttons
+      useEffect(() => {
+        const handlePopState = () => {
+          const s = parseInitialState();
+          setViewState(s.view);
+          setAdminSubSectionState(s.sub);
+        };
+        window.addEventListener('popstate', handlePopState);
+        window.addEventListener('hashchange', handlePopState);
+        return () => {
+          window.removeEventListener('popstate', handlePopState);
+          window.removeEventListener('hashchange', handlePopState);
+        };
+      }, []);
 
       // Admin Authentication State
       const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
@@ -332,8 +372,14 @@
       const [receipts, setReceipts] = useState(() => {
         try {
           const saved = localStorage.getItem('stp_receipts');
-          return saved ? JSON.parse(saved) : INITIAL_RECEIPTS;
-        } catch(e) { return INITIAL_RECEIPTS; }
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          }
+          return INITIAL_RECEIPTS;
+        } catch(e) { 
+          return INITIAL_RECEIPTS; 
+        }
       });
 
       const [bankAccounts, setBankAccounts] = useState(INITIAL_BANK_ACCOUNTS);
@@ -597,7 +643,7 @@
           ) : (
             <AdminBillingSystem 
               adminSubSection={adminSubSection}
-              setAdminSubSection={setAdminSubSection}
+              setAdminSubSection={changeAdminSection}
               onBackToPublic={() => setView('public')}
               onLogout={handleAdminLogout}
               orgSettings={orgSettings}
@@ -738,9 +784,12 @@
                   onChange={e => setSelectedFY(e.target.value)}
                   className="w-full bg-transparent text-xs font-bold text-amber-400 focus:outline-none cursor-pointer"
                 >
-                  <option value="2026-27" className="bg-slate-900">FY 2026–2027 (Active)</option>
-                  <option value="2025-26" className="bg-slate-900">FY 2025–2026 (Audit Archive)</option>
-                  <option value="2024-25" className="bg-slate-900">FY 2024–2025 (Historical)</option>
+                  {/* Dynamic Financial Years from imported data */}
+                  {Array.from(new Set([selectedFY, "2026-27", "2025-26", "2024-25", "2023-24", "2022-23", "2021-22", ...receipts.map(r => r.financialYear).filter(Boolean)])).sort().reverse().map(fy => (
+                    <option key={fy} value={fy} className="bg-slate-900">
+                      FY {fy} {fy === "2026-27" ? "(Current)" : "(Records Archive)"}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -900,13 +949,16 @@
             {adminSubSection === 'reports' && (
               <SectionFinancialReports 
                 receipts={receipts}
+                setReceipts={setReceipts}
                 bankAccounts={bankAccounts}
                 bankTransactions={bankTransactions}
                 selectedFY={selectedFY}
+                setSelectedFY={setSelectedFY}
                 selectedMonth={selectedMonth}
                 setSelectedMonth={setSelectedMonth}
                 orgSettings={orgSettings}
                 notify={notify}
+                onOpenCreateReceipt={onOpenCreateReceipt}
               />
             )}
 
@@ -1176,23 +1228,23 @@
               <table className="w-full text-left text-xs text-slate-600">
                 <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold tracking-wider">
                   <tr>
-                    <th className="py-3 px-4">S.No.</th>
-                    <th className="py-3 px-4">Receipt No.</th>
-                    <th className="py-3 px-4">Date</th>
-                    <th className="py-3 px-4">Donor Name</th>
-                    <th className="py-3 px-4">Mobile</th>
-                    <th className="py-3 px-4">Purpose</th>
-                    <th className="py-3 px-4">Mode</th>
-                    <th className="py-3 px-4">Amount</th>
-                    <th className="py-3 px-4 text-center">Activities</th>
-                    <th className="py-3 px-4 text-right">Receipt Actions</th>
+                    <th className="py-3 px-3">S NO</th>
+                    <th className="py-3 px-3">DATE</th>
+                    <th className="py-3 px-3">NAME OF DONOR</th>
+                    <th className="py-3 px-3">ADDREES OF DONOR</th>
+                    <th className="py-3 px-3">PAN OF DONOR</th>
+                    <th className="py-3 px-3 text-right">AMT INVOLVED (₹)</th>
+                    <th className="py-3 px-3">MODE OF PAYMENT</th>
+                    <th className="py-3 px-3">NATURE (CORPUS / NON CORPUS)</th>
+                    <th className="py-3 px-3">RECEIPT NO</th>
+                    <th className="py-3 px-3 text-right">ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {displayReceipts.length === 0 ? (
                     <tr>
                       <td colSpan="10" className="py-12 text-center text-slate-400">
-                        No receipts found for this selection. Click <strong>"Create Donation Receipt"</strong> to add an entry.
+                        No receipts found for this selection. Click <strong>"Create Donation Receipt"</strong> or import Excel to view entries.
                       </td>
                     </tr>
                   ) : (
@@ -1203,75 +1255,60 @@
 
                       return (
                         <tr key={r.id} className={`hover:bg-slate-50/80 transition ${isCancelled ? 'bg-rose-50/30' : ''}`}>
-                          <td className="py-3.5 px-4 font-bold text-slate-400">{idx + 1}</td>
-                          <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                            {r.receiptNo}
-                            {isCancelled && <span className="ml-1.5 text-[10px] bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded">Cancelled</span>}
-                          </td>
-                          <td className="py-3.5 px-4 text-slate-600">{r.date}</td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-3.5 px-3 font-bold text-slate-400">{r.sNo || (idx + 1)}</td>
+                          <td className="py-3.5 px-3 text-slate-600 whitespace-nowrap">{r.date}</td>
+                          <td className="py-3.5 px-3">
                             <div className="font-bold text-slate-900">{r.donorName}</div>
-                            {r.pan && <div className="text-[10px] text-slate-400">PAN: {r.pan}</div>}
                           </td>
-                          <td className="py-3.5 px-4">{r.mobile}</td>
-                          <td className="py-3.5 px-4 text-slate-700">{r.purpose}</td>
-                          <td className="py-3.5 px-4">{r.paymentMode}</td>
-                          <td className="py-3.5 px-4 font-extrabold text-slate-900">₹{r.amount.toLocaleString()}</td>
+                          <td className="py-3.5 px-3 text-slate-600">{r.address || '—'}</td>
+                          <td className="py-3.5 px-3 font-mono font-bold text-[#E22D4E]">{r.pan || '—'}</td>
+                          <td className="py-3.5 px-3 font-extrabold text-slate-900 text-right whitespace-nowrap">₹{Number(r.amount).toLocaleString()}</td>
+                          <td className="py-3.5 px-3 font-semibold text-slate-700">{r.paymentMode || 'UPI'}</td>
+                          <td className="py-3.5 px-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              String(r.nature || r.purpose).toUpperCase().includes('CORPUS') && !String(r.nature || r.purpose).toUpperCase().includes('NON') 
+                                ? 'bg-amber-100 text-amber-800' 
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {r.nature || r.purpose || 'NON CORPUS'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                            {r.receiptNo}
+                            {isCancelled && <span className="ml-1 text-[9px] bg-rose-100 text-rose-700 font-bold px-1 py-0.5 rounded">Cancelled</span>}
+                          </td>
                           
-                          {/* Activities Button directly linked to each receipt */}
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              onClick={() => onOpenActivities(r)}
-                              className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-bold border border-amber-200 transition inline-flex items-center gap-1"
-                              title="Manage activities and bills for this donation"
-                            >
-                              <span>🎯 Activities</span>
-                              {actCount > 0 && <span className="bg-amber-600 text-white rounded-full px-1.5 text-[9px]">{actCount}</span>}
-                            </button>
-                            {actCount > 0 && (
-                              <div className="text-[9px] text-slate-400 mt-0.5">₹{actUtilised.toLocaleString()} spent</div>
-                            )}
-                          </td>
-
-                          {/* Action Options */}
-                          <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
-                            <button
+                          {/* Receipt Actions */}
+                          <td className="py-3.5 px-3 text-right space-x-1.5 whitespace-nowrap">
+                            <button 
                               onClick={() => onViewReceipt(r)}
-                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px]"
+                              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-bold rounded-xl transition"
                               title="View & Download PDF"
                             >
-                              View PDF
+                              PDF
                             </button>
-
+                            <button 
+                              onClick={() => onOpenActivities(r)}
+                              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-[#E22D4E] text-[11px] font-bold rounded-xl transition"
+                              title="Manage activities and bills"
+                            >
+                              Activities ({actCount})
+                            </button>
                             <button
                               onClick={() => {
-                                const msg = `Dear ${r.donorName}, thank you for your generous contribution of Rs. ${r.amount} to Save The People Charitable Trust. Receipt No: ${r.receiptNo}. Download your 80G Tax Exemption Receipt.`;
-                                window.open(`https://wa.me/${r.mobile.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+                                const msg = `Dear ${r.donorName}, thank you for your generous contribution of Rs. ${r.amount} to Save The People Charitable Trust. Receipt No: ${r.receiptNo}.`;
+                                window.open(`https://wa.me/${(r.mobile||'').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
                               }}
-                              className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[#00A859] font-bold text-[11px]"
+                              className="px-2 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#00A859] font-bold text-[11px] transition"
                               title="Share on WhatsApp"
                             >
                               WhatsApp
                             </button>
-
-                            {r.email && (
-                              <button
-                                onClick={() => {
-                                  alert(`Official Receipt Email with attached PDF queued for: ${r.email}\nSubject: Donation Receipt – SAVE THE PEOPLE CHARITABLE TRUST`);
-                                  notify(`Receipt sent to ${r.email}`);
-                                }}
-                                className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px]"
-                                title="Send Email"
-                              >
-                                Email
-                              </button>
-                            )}
-
                             {!isCancelled && (
                               <button
                                 onClick={() => handleCancelReceipt(r.id)}
-                                className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-[11px]"
-                                title="Cancel receipt (keeps in audit log)"
+                                className="px-2 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-[11px] transition"
+                                title="Cancel receipt"
                               >
                                 Cancel
                               </button>
@@ -1743,38 +1780,307 @@
     }
 
     // =========================================================================
-    // SECTION 11 & 12: FINANCIAL REPORTS (CONSOLIDATED MONTHLY & YEARLY)
+    // SECTION 11 & 12: FINANCIAL REPORTS (CONSOLIDATED MONTHLY & YEARLY + EXCEL IMPORT)
     // =========================================================================
-    function SectionFinancialReports({ receipts, bankAccounts, bankTransactions, selectedFY, selectedMonth, setSelectedMonth, orgSettings, notify }) {
-      const monthReceipts = receipts.filter(r => r.financialYear === selectedFY && r.month === selectedMonth && r.status !== 'Cancelled');
-      const totalMonthDonations = monthReceipts.reduce((a,c) => a + Number(c.amount || 0), 0);
-      
-      let monthActivities = [];
-      monthReceipts.forEach(r => {
-        (r.activities || []).forEach(a => monthActivities.push({ ...a, receiptNo: r.receiptNo, donorName: r.donorName }));
-      });
-      const totalMonthUtilised = monthActivities.reduce((a,c) => a + Number(c.amountUtilised || 0), 0);
+    function SectionFinancialReports({ receipts, setReceipts, bankAccounts, bankTransactions, selectedFY, setSelectedFY, selectedMonth, setSelectedMonth, orgSettings, notify, onOpenCreateReceipt }) {
+      const fileInputRef = useRef(null);
+      const [isImporting, setIsImporting] = useState(false);
+      // 'all-years' = show every single record across all years.
+      // 'fy-all' = show all records in selected FY without filtering by month.
+      // 'month' = filter by selected month.
+      const [viewFilter, setViewFilter] = useState('all-years'); // 'all-years' | 'fy-all' | 'month'
 
-      const downloadConsolidatedExcel = (isFullYear = false) => {
-        const title = isFullYear ? `Full_FY_${selectedFY}_Consolidated_Report` : `Monthly_Report_${selectedMonth}_${selectedFY}`;
+      // Search & Pagination States
+      const [tableSearch, setTableSearch] = useState('');
+      const [currentPage, setCurrentPage] = useState(1);
+      const [rowsPerPage, setRowsPerPage] = useState(50); // 25, 50, 100, 200, 500
+
+      // Filter receipts according to viewFilter & tableSearch
+      const filteredReceipts = useMemo(() => {
+        let base = [];
+        if (viewFilter === 'all-years') {
+          base = receipts.filter(r => r.status !== 'Cancelled');
+        } else if (viewFilter === 'fy-all') {
+          base = receipts.filter(r => r.financialYear === selectedFY && r.status !== 'Cancelled');
+        } else {
+          base = receipts.filter(r => r.financialYear === selectedFY && r.month === selectedMonth && r.status !== 'Cancelled');
+        }
+
+        if (tableSearch.trim()) {
+          const q = tableSearch.toLowerCase();
+          base = base.filter(r => 
+            (r.donorName && r.donorName.toLowerCase().includes(q)) ||
+            (r.pan && r.pan.toLowerCase().includes(q)) ||
+            (r.address && r.address.toLowerCase().includes(q)) ||
+            (r.receiptNo && r.receiptNo.toLowerCase().includes(q)) ||
+            (r.paymentMode && r.paymentMode.toLowerCase().includes(q)) ||
+            (r.date && r.date.includes(q)) ||
+            (r.sNo && String(r.sNo).includes(q))
+          );
+        }
+        return base;
+      }, [receipts, selectedFY, selectedMonth, viewFilter, tableSearch]);
+
+      // Reset to page 1 when filter or search changes
+      useEffect(() => {
+        setCurrentPage(1);
+      }, [viewFilter, selectedFY, selectedMonth, tableSearch, rowsPerPage]);
+
+      const totalPages = Math.max(1, Math.ceil(filteredReceipts.length / rowsPerPage));
+      const paginatedReceipts = useMemo(() => {
+        const start = (currentPage - 1) * rowsPerPage;
+        return filteredReceipts.slice(start, start + rowsPerPage);
+      }, [filteredReceipts, currentPage, rowsPerPage]);
+
+      const totalDonationsAmount = filteredReceipts.reduce((a,c) => a + Number(c.amount || 0), 0);
+      
+      let matchedActivities = [];
+      filteredReceipts.forEach(r => {
+        (r.activities || []).forEach(a => matchedActivities.push({ ...a, receiptNo: r.receiptNo, donorName: r.donorName }));
+      });
+      const totalUtilisedAmount = matchedActivities.reduce((a,c) => a + Number(c.amountUtilised || 0), 0);
+
+      // Handle Excel Upload (.xlsx / .xls)
+      const handleExcelUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setIsImporting(true);
+        const reader = new FileReader();
+
+        reader.onload = (evt) => {
+          try {
+            if (!window.XLSX) {
+              alert("Excel reader library is loading. Please try again in 2 seconds.");
+              setIsImporting(false);
+              return;
+            }
+
+            const data = new Uint8Array(evt.target.result);
+            const workbook = window.XLSX.read(data, { type: 'array' });
+            
+            let allRows = [];
+            // Parse through all sheets
+            workbook.SheetNames.forEach(sheetName => {
+              const worksheet = workbook.Sheets[sheetName];
+              // 1. First convert sheet to 2D array of rows to accurately detect header row
+              const sheetData = window.XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+              if (!sheetData || !sheetData.length) return;
+
+              // 2. Find which row index contains the column headers
+              let headerRowIndex = 0;
+              for (let i = 0; i < Math.min(sheetData.length, 10); i++) {
+                const rowCells = sheetData[i].map(c => String(c).toLowerCase().replace(/[^a-z0-9]/g, ''));
+                // Check if this row looks like header: has 'pan', 'donor', 'date', or 'amt'
+                const hasPan = rowCells.some(c => c.includes('pan'));
+                const hasDonor = rowCells.some(c => c.includes('donor') || c.includes('name'));
+                const hasAmt = rowCells.some(c => c.includes('amt') || c.includes('amount'));
+                if ((hasPan && hasDonor) || (hasDonor && hasAmt) || (hasPan && hasAmt)) {
+                  headerRowIndex = i;
+                  break;
+                }
+              }
+
+              // 3. Extract JSON using the detected header row
+              const json = window.XLSX.utils.sheet_to_json(worksheet, { range: headerRowIndex, defval: "" });
+              if (json && json.length) {
+                // Attach the sheet name to each row so we know its Financial Year (e.g. FY 2025-2026, FY 2024-2025, etc.)
+                const withSheet = json.map(r => ({ ...r, _sheetName: sheetName }));
+                allRows = [...allRows, ...withSheet];
+              }
+            });
+
+            if (!allRows.length) {
+              alert("No data found in the selected Excel file.");
+              setIsImporting(false);
+              return;
+            }
+
+            // Normalise and convert rows into official Trust Donation Receipts
+            let importedCount = 0;
+            const newReceipts = [];
+
+            allRows.forEach((row, idx) => {
+              // Try finding PAN, Name, Amount, Date, Mobile from common column names
+              const keys = Object.keys(row);
+              const findVal = (keywords) => {
+                const foundKey = keys.find(k => {
+                  const cleanKey = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                  return keywords.some(kw => cleanKey.includes(kw));
+                });
+                return foundKey ? row[foundKey] : "";
+              };
+
+              const donorNameRaw = findVal(["nameofdonor", "donorname", "donor", "name", "client", "person"]);
+              // If there's no donor name and no amount and no PAN, skip blank trailing rows
+              if (!donorNameRaw && !row["AMT INVOLVED IN RS"] && !row["PAN OF DONOR"]) {
+                return;
+              }
+              const donorName = donorNameRaw ? String(donorNameRaw).trim() : "Valued Donor";
+
+              // Find PAN: check "panofdonor", "panno", "pan", etc.
+              let panRaw = (findVal(["panofdonor", "donorpan", "pan", "pannumber", "panno"]) || "").toString().trim().toUpperCase();
+              // Ignore placeholders like "NO", "NILL", "NIL", "NA", "NONE", "-"
+              if (["NO", "NILL", "NIL", "NA", "N/A", "NONE", "-", ""].includes(panRaw)) {
+                panRaw = "";
+              }
+              const pan = panRaw;
+
+              // Exact columns from Excel
+              const sNo = findVal(["sno", "slno", "serial"]) || (importedCount + 1);
+              const address = (findVal(["addreesofdonor", "addressofdonor", "address", "city", "place"]) || "").toString().trim();
+              const paymentMode = (findVal(["modeofpayment", "paymentmode", "mode", "method"]) || "UPI").toString().trim();
+              const nature = (findVal(["naturedonationcorpusornoncorpus", "natureofdonation", "nature", "corpus", "noncorpus"]) || "NON CORPUS").toString().trim();
+
+              // Amount
+              let amount = parseFloat((findVal(["amtinvolvedinrs", "amountinvolved", "amount", "donationamount", "amt", "total"]) || "0").toString().replace(/[^0-9.]/g, ''));
+              if (isNaN(amount) || amount <= 0) amount = 1000;
+
+              const mobile = (findVal(["mobile", "phone", "contact", "cell"]) || "+91 98765 43210").toString();
+              const dateRaw = findVal(["date", "receiptdate", "txndate", "donationdate"]);
+              
+              // Normalize Date (handles DD-MM-YYYY, YYYY-MM-DD, Excel serials, etc.)
+              let dateStr = "";
+              if (dateRaw instanceof Date) {
+                dateStr = dateRaw.toISOString().slice(0, 10);
+              } else if (typeof dateRaw === 'number') {
+                // Excel serial date format (offset 25569 days from Jan 1 1970)
+                const excelDate = new Date(Math.round((dateRaw - 25569) * 86400 * 1000));
+                if (!isNaN(excelDate.getTime())) dateStr = excelDate.toISOString().slice(0, 10);
+              } else if (typeof dateRaw === 'string' && dateRaw.trim()) {
+                const s = dateRaw.trim();
+                // Check DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY
+                const dmyMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+                // Check YYYY-MM-DD
+                const ymdMatch = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+                if (dmyMatch) {
+                  const day = dmyMatch[1].padStart(2, '0');
+                  const month = dmyMatch[2].padStart(2, '0');
+                  const year = dmyMatch[3];
+                  dateStr = `${year}-${month}-${day}`;
+                } else if (ymdMatch) {
+                  const year = ymdMatch[1];
+                  const month = ymdMatch[2].padStart(2, '0');
+                  const day = ymdMatch[3].padStart(2, '0');
+                  dateStr = `${year}-${month}-${day}`;
+                } else {
+                  dateStr = s.slice(0, 10);
+                }
+              }
+
+              // Fallback if no valid date found in row
+              if (!dateStr || dateStr.length < 8) {
+                dateStr = "2025-04-01";
+              }
+
+              // Determine Financial Year and Month from date & sheet name
+              let fy = selectedFY;
+              let monthName = "April";
+
+              try {
+                const parts = dateStr.split('-');
+                if (parts.length === 3) {
+                  const y = parseInt(parts[0], 10);
+                  const m = parseInt(parts[1], 10) - 1; // 0=Jan, 1=Feb, 2=Mar, 3=Apr... 11=Dec
+                  if (!isNaN(y) && !isNaN(m) && m >= 0 && m <= 11) {
+                    const CALENDAR_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                    monthName = CALENDAR_MONTHS[m];
+                    const startYear = m >= 3 ? y : y - 1;
+                    fy = `${startYear}-${(startYear + 1).toString().slice(-2)}`;
+                  }
+                }
+              } catch(err) {}
+
+              // If sheet name explicitly has FY (e.g. "FY 2021-2022" or "FY 2025-2026"), format it cleanly
+              const sheetFYMatch = (row._sheetName || "").match(/20(\d{2})[-_\s/]*20?(\d{2})/i);
+              if (sheetFYMatch) {
+                const y1 = parseInt(`20${sheetFYMatch[1]}`, 10);
+                const y2 = parseInt(`20${sheetFYMatch[2]}`, 10);
+                const endShort = y2 ? String(y2).slice(-2) : String(y1 + 1).slice(-2);
+                fy = `${y1}-${endShort}`;
+              }
+
+              // Auto-assign sequential receipt number
+              const seqNumber = String(receipts.length + importedCount + 1).padStart(6, '0');
+              const receiptNo = `${orgSettings.receiptPrefix || 'STPCT'}/${fy}/${seqNumber}`;
+
+              newReceipts.push({
+                id: `REC-IMP-${Date.now()}-${idx}`,
+                sNo: sNo,
+                receiptNo,
+                date: dateStr,
+                financialYear: fy,
+                month: monthName,
+                donorName: donorName,
+                address: address,
+                pan: pan,
+                nature: nature,
+                mobile: String(mobile).trim(),
+                email: "",
+                amount,
+                amountInWords: numberToWordsINR(amount),
+                purpose: nature || "NON CORPUS",
+                paymentMode: paymentMode,
+                refNo: `IT-PAN-IMP-${idx + 1}`,
+                status: "Completed",
+                activities: []
+              });
+              importedCount++;
+            });
+
+            if (newReceipts.length > 0) {
+              // Replace any previous imported records with the fresh accurate ones
+              const manualOnly = receipts.filter(r => !r.id.startsWith('REC-IMP-'));
+              const combined = [...newReceipts, ...manualOnly];
+              setReceipts(combined);
+              
+              // Set view to All Years so user immediately sees the entire dataset!
+              setViewFilter('all-years');
+
+              notify(`Successfully imported ${importedCount} records with PAN & Donor details across all Financial Years!`, "success");
+            }
+          } catch(err) {
+            console.error("Excel import error:", err);
+            alert("Error parsing Excel file: " + (err.message || err));
+          } finally {
+            setIsImporting(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }
+        };
+
+        reader.readAsArrayBuffer(file);
+      };
+
+      const downloadExport = (mode = 'all') => {
+        // mode: 'all' = export all years | 'fy' = export selected FY | 'month' = export selected month
+        let targetReceipts = [];
+        let title = "";
+
+        if (mode === 'all') {
+          targetReceipts = receipts.filter(r => r.status !== 'Cancelled');
+          title = `All_Years_Consolidated_Donations_Report`;
+        } else if (mode === 'fy') {
+          targetReceipts = receipts.filter(r => r.financialYear === selectedFY && r.status !== 'Cancelled');
+          title = `Full_FY_${selectedFY}_Consolidated_Report`;
+        } else {
+          targetReceipts = receipts.filter(r => r.financialYear === selectedFY && r.month === selectedMonth && r.status !== 'Cancelled');
+          title = `Monthly_Report_${selectedMonth}_${selectedFY}`;
+        }
+
+        const totalAmt = targetReceipts.reduce((a,c) => a + Number(c.amount || 0), 0);
+
         const lines = [
           `SAVE THE PEOPLE CHARITABLE TRUST - CONSOLIDATED AUDIT REPORT (${title})`,
           `Registration: ${orgSettings.regNo} | PAN: ${orgSettings.orgPan} | 80G: ${orgSettings.section80G}`,
           `Generated On: ${new Date().toLocaleString()}`,
           "",
-          "PART 1: DONATION RECEIPTS REGISTER",
-          "Receipt No,Date,Donor Name,Mobile,PAN,Purpose,Payment Mode,Amount",
-          ...receipts.filter(r => isFullYear ? r.financialYear === selectedFY : (r.financialYear === selectedFY && r.month === selectedMonth))
-                     .map(r => `"${r.receiptNo}","${r.date}","${r.donorName}","${r.mobile}","${r.pan || ''}","${r.purpose}","${r.paymentMode}",${r.amount}`),
+          "PART 1: DONATION RECEIPTS REGISTER (EXACT INCOME TAX FORMAT)",
+          "S NO,DATE,FY,NAME OF DONOR,ADDREES OF DONOR,PAN OF DONOR,AMT INVOLVED IN RS,MODE OF PAYMENT,NATURE (CORPUS OR NON CORPUS),RECEIPT NO",
+          ...targetReceipts.map((r, i) => `"${r.sNo || (i + 1)}","${r.date}","${r.financialYear}","${r.donorName}","${r.address || ''}","${r.pan || ''}",${r.amount},"${r.paymentMode || 'UPI'}","${r.nature || r.purpose || 'NON CORPUS'}","${r.receiptNo}"`),
           "",
-          "PART 2: GROUND ACTIVITIES & UTILISATION",
-          "Date,Activity Name,Category,Receipt No,Donor Name,Beneficiary,Amount Utilised,Documents",
-          ...monthActivities.map(a => `"${a.date}","${a.name}","${a.category}","${a.receiptNo}","${a.donorName}","${a.beneficiary}",${a.amountUtilised},"${(a.files||[]).join(';')}"`),
-          "",
-          "PART 3: FINANCIAL RECONCILIATION SUMMARY",
-          `Total Donations Received,Rs. ${totalMonthDonations}`,
-          `Total Amount Utilised,Rs. ${totalMonthUtilised}`,
-          `Remaining Balance,Rs. ${totalMonthDonations - totalMonthUtilised}`
+          "PART 2: FINANCIAL RECONCILIATION SUMMARY",
+          `Total Records Exported,${targetReceipts.length}`,
+          `Total Donations Received,Rs. ${totalAmt}`
         ];
 
         const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -1782,68 +2088,352 @@
         a.href = URL.createObjectURL(blob);
         a.download = `${title}.csv`;
         a.click();
-        notify(`Consolidated ${title} downloaded successfully!`);
+        notify(`Exported ${targetReceipts.length} records successfully! (${title})`);
       };
 
       return (
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h2 className="text-xl font-extrabold text-slate-900">Comprehensive Audit Reports</h2>
-              <p className="text-xs text-slate-500">7-Part consolidated registers containing Receipts, Activities, Proofs, and Bank Summaries</p>
-            </div>
+          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
+            {/* Title on the left */}
+            <h2 className="text-xl font-extrabold text-slate-900 shrink-0">Comprehensive Audit Reports</h2>
             
-            <div className="flex gap-2">
+            {/* All 4 Action Buttons in the same row towards the right */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* HIDDEN FILE INPUT FOR EXCEL IMPORT */}
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleExcelUpload} 
+                accept=".xlsx, .xls, .csv" 
+                className="hidden" 
+              />
+
+              {/* 1. NEW ENTRY (Manual Entry for single donor) */}
               <button
-                onClick={() => downloadConsolidatedExcel(false)}
-                className="bg-[#E22D4E] hover:bg-[#c92040] text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition"
+                onClick={onOpenCreateReceipt}
+                className="bg-[#E22D4E] hover:bg-[#c92040] text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-[#E22D4E]/25 transition flex items-center gap-1.5"
+                title="Manually create a new donation receipt entry"
               >
-                Download Monthly Report ({selectedMonth})
+                <span>➕</span>
+                <span>Add Entry Manually</span>
               </button>
+
+              {/* 2. IMPORT DATA */}
               <button
-                onClick={() => downloadConsolidatedExcel(true)}
-                className="bg-[#10141E] hover:bg-black text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition"
+                onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                disabled={isImporting}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition flex items-center gap-1.5"
+                title="Upload Excel .xlsx / .xls file"
               >
-                Download Overall FY ({selectedFY}) Report
+                <span>📥</span>
+                <span>{isImporting ? "Importing Data..." : "Import Data"}</span>
               </button>
+
+              {/* 3. EXPORT DATA (Exports currently selected scope) */}
+              <button
+                onClick={() => downloadExport(viewFilter === 'all-years' ? 'all' : viewFilter === 'fy-all' ? 'fy' : 'month')}
+                className="bg-[#10141E] hover:bg-black text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition flex items-center gap-1.5"
+                title="Export current view to Excel / CSV"
+              >
+                <span>📤</span>
+                <span>Export Data</span>
+              </button>
+
+              {/* 4. DOWNLOAD MONTHLY REPORT (Enabled after selecting year and month) */}
+              {viewFilter === 'month' ? (
+                <button
+                  onClick={() => downloadExport('month')}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition flex items-center gap-1.5 animate-pulse"
+                  title={`Download Monthly Report for ${selectedMonth} (FY ${selectedFY})`}
+                >
+                  <span>📄</span>
+                  <span>Download Monthly Report ({selectedMonth} {selectedFY})</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => alert("Please select a specific Financial Year and Month below to download its monthly report.")}
+                  className="bg-slate-100 text-slate-400 font-semibold text-xs px-4 py-2.5 rounded-xl border border-slate-200 transition cursor-not-allowed flex items-center gap-1.5"
+                  title="Select a year and month below to unlock"
+                >
+                  <span>📄</span>
+                  <span>Download Monthly Report (Select Year & Month)</span>
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Month Selector for Reports */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center gap-2 overflow-x-auto text-xs">
-            <span className="font-bold text-slate-400 uppercase text-[10px] shrink-0">Select Month:</span>
-            {FY_MONTHS.map(m => (
-              <button
-                key={m}
-                onClick={() => setSelectedMonth(m)}
-                className={`px-3 py-1.5 rounded-lg font-bold shrink-0 text-xs ${
-                  selectedMonth === m ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {m}
-              </button>
-            ))}
+          {/* Interactive Year & Month Hierarchy Bar */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+            
+            {/* 1. Year Filter Selector as a Dropdown */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#E22D4E]"></span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">Financial Year Filter:</span>
+              </div>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="relative w-full sm:w-72">
+                  <select
+                    value={viewFilter === 'all-years' ? 'all' : selectedFY}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'all') {
+                        setViewFilter('all-years');
+                      } else {
+                        setSelectedFY(val);
+                        setViewFilter('fy-all');
+                      }
+                    }}
+                    className="w-full appearance-none bg-slate-50 hover:bg-slate-100 border-2 border-slate-200 hover:border-[#E22D4E]/40 focus:border-[#E22D4E] focus:bg-white text-slate-800 font-bold text-xs rounded-2xl px-4 py-2.5 pr-10 shadow-sm outline-none transition cursor-pointer"
+                  >
+                    <option value="all">
+                      🌐 All Years Combined ({receipts.filter(r => r.status !== 'Cancelled').length} Records)
+                    </option>
+                    {Array.from(new Set([selectedFY, ...receipts.map(r => r.financialYear).filter(Boolean)])).sort().reverse().map(fy => {
+                      const countInFY = receipts.filter(r => r.financialYear === fy && r.status !== 'Cancelled').length;
+                      return (
+                        <option key={fy} value={fy}>
+                          FY {fy} ({countInFY} Records)
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-500">
+                    <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd"></path>
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Quick Badge indicator */}
+                <span className="hidden sm:inline-flex items-center text-[11px] font-bold px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700">
+                  {viewFilter === 'all-years' ? 'All Years View' : `Active: FY ${selectedFY}`}
+                </span>
+              </div>
+            </div>
+
+            {/* 2. Month Selector (Shown dynamically for the chosen Financial Year) */}
+            {viewFilter !== 'all-years' ? (
+              <div className="flex items-center gap-2 overflow-x-auto text-xs pt-1">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
+                  Months in FY {selectedFY}:
+                </span>
+                
+                {/* Total All Months in this FY */}
+                <button
+                  onClick={() => setViewFilter('fy-all')}
+                  className={`px-3.5 py-1.5 rounded-xl font-bold shrink-0 text-xs transition flex items-center gap-1.5 ${
+                    viewFilter === 'fy-all' 
+                      ? 'bg-slate-900 text-white shadow' 
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>⭐ Full Year Total</span>
+                  <span className={`text-[9px] px-1.5 py-0.2 rounded-full ${viewFilter === 'fy-all' ? 'bg-[#E22D4E] text-white' : 'bg-slate-300 text-slate-800'}`}>
+                    {receipts.filter(r => r.financialYear === selectedFY && r.status !== 'Cancelled').length}
+                  </span>
+                </button>
+
+                {/* Only render months that exist in Indian FY order */}
+                {FY_MONTHS.map(m => {
+                  const countInMonth = receipts.filter(r => r.financialYear === selectedFY && r.month === m && r.status !== 'Cancelled').length;
+                  const isSelected = viewFilter === 'month' && selectedMonth === m;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => { setSelectedMonth(m); setViewFilter('month'); }}
+                      className={`px-3 py-1.5 rounded-xl font-bold shrink-0 text-xs transition flex items-center gap-1.5 ${
+                        isSelected 
+                          ? 'bg-[#E22D4E] text-white shadow' 
+                          : countInMonth > 0 
+                            ? 'bg-rose-50 text-slate-800 border border-rose-200 hover:bg-rose-100' 
+                            : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span>{m}</span>
+                      {countInMonth > 0 && (
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${isSelected ? 'bg-white text-[#E22D4E]' : 'bg-[#E22D4E] text-white'}`}>
+                          {countInMonth}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-2 pt-1">
+                <span>💡 Showing all <strong>{receipts.filter(r => r.status !== 'Cancelled').length} records</strong> across all financial years. Select a specific <strong>Financial Year from the dropdown above</strong> to filter down to that year and its months.</span>
+              </div>
+            )}
+
           </div>
 
           {/* 7-PART REPORT PREVIEW CARDS */}
           <div className="grid md:grid-cols-3 gap-4">
             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
               <span className="text-[10px] font-bold uppercase text-slate-400">PART 1: DONATIONS SUMMARY</span>
-              <p className="text-xl font-extrabold text-slate-900">₹{totalMonthDonations.toLocaleString()}</p>
-              <p className="text-xs text-slate-500">{monthReceipts.length} Donors for {selectedMonth} {selectedFY}</p>
+              <p className="text-xl font-extrabold text-slate-900">₹{totalDonationsAmount.toLocaleString()}</p>
+              <p className="text-xs text-slate-500">
+                {filteredReceipts.length} Donors {viewFilter === 'all-years' ? '(Across All FYs)' : viewFilter === 'fy-all' ? `(Entire FY ${selectedFY})` : `(${selectedMonth} ${selectedFY})`}
+              </p>
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
               <span className="text-[10px] font-bold uppercase text-slate-400">PART 2 & 3: ACTIVITIES DEPLOYED</span>
-              <p className="text-xl font-extrabold text-[#E22D4E]">₹{totalMonthUtilised.toLocaleString()}</p>
-              <p className="text-xs text-slate-500">{monthActivities.length} Field Activities Logged</p>
+              <p className="text-xl font-extrabold text-[#E22D4E]">₹{totalUtilisedAmount.toLocaleString()}</p>
+              <p className="text-xs text-slate-500">{matchedActivities.length} Field Activities Logged</p>
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
               <span className="text-[10px] font-bold uppercase text-slate-400">PART 5: NET SURPLUS / BALANCE</span>
-              <p className="text-xl font-extrabold text-[#00A859]">₹{(totalMonthDonations - totalMonthUtilised).toLocaleString()}</p>
+              <p className="text-xl font-extrabold text-[#00A859]">₹{(totalDonationsAmount - totalUtilisedAmount).toLocaleString()}</p>
               <p className="text-xs text-slate-500">100% Retained in Trust Accounts</p>
             </div>
+          </div>
+
+          {/* TABLE: DONATION RECEIPTS IN THIS VIEW */}
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            
+            {/* Table Controls Header: Search, Count, Rows-Per-Page */}
+            <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-3 bg-slate-50/70">
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <span className="text-xs font-bold text-slate-800">
+                  {filteredReceipts.length} Records {viewFilter === 'all-years' ? '(All Years)' : viewFilter === 'fy-all' ? `(FY ${selectedFY})` : `(${selectedMonth} ${selectedFY})`}
+                </span>
+                <span className="text-xs font-extrabold text-[#00A859] bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                  Total: ₹{totalDonationsAmount.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+                {/* Search Box */}
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-slate-400 text-xs">🔍</span>
+                  <input
+                    type="text"
+                    value={tableSearch}
+                    onChange={e => setTableSearch(e.target.value)}
+                    placeholder="Search donor, PAN, city..."
+                    className="bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#E22D4E] w-48 sm:w-60"
+                  />
+                  {tableSearch && (
+                    <button onClick={() => setTableSearch('')} className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                  )}
+                </div>
+
+                {/* Rows per page selector */}
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold bg-white border border-slate-200 rounded-xl px-2.5 py-1">
+                  <span>Rows:</span>
+                  <select
+                    value={rowsPerPage}
+                    onChange={e => setRowsPerPage(Number(e.target.value))}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={250}>250</option>
+                    <option value={500}>500</option>
+                    <option value={1000}>1000</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {filteredReceipts.length === 0 ? (
+              <div className="p-12 text-center text-xs text-slate-400">
+                No donation records found matching your filters.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold tracking-wider">
+                    <tr>
+                      <th className="py-2.5 px-3">S NO</th>
+                      <th className="py-2.5 px-3">DATE</th>
+                      <th className="py-2.5 px-3">FY</th>
+                      <th className="py-2.5 px-3">NAME OF DONOR</th>
+                      <th className="py-2.5 px-3">ADDREES OF DONOR</th>
+                      <th className="py-2.5 px-3">PAN OF DONOR</th>
+                      <th className="py-2.5 px-3 text-right">AMT INVOLVED IN RS</th>
+                      <th className="py-2.5 px-3">MODE OF PAYMENT</th>
+                      <th className="py-2.5 px-3">NATURE (CORPUS / NON CORPUS)</th>
+                      <th className="py-2.5 px-3">RECEIPT NO</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {paginatedReceipts.map((r, i) => (
+                      <tr key={r.id} className="hover:bg-slate-50 transition">
+                        <td className="py-2.5 px-3 font-semibold text-slate-500">{r.sNo || ((currentPage - 1) * rowsPerPage + i + 1)}</td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">{r.date}</td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-amber-600">{r.financialYear}</td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">{r.donorName}</td>
+                        <td className="py-2.5 px-3 text-slate-600">{r.address || '—'}</td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-[#E22D4E]">{r.pan || '—'}</td>
+                        <td className="py-2.5 px-3 font-extrabold text-slate-900 text-right whitespace-nowrap">₹{Number(r.amount).toLocaleString()}</td>
+                        <td className="py-2.5 px-3 font-semibold text-slate-700">{r.paymentMode || 'UPI'}</td>
+                        <td className="py-2.5 px-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            String(r.nature || r.purpose).toUpperCase().includes('CORPUS') && !String(r.nature || r.purpose).toUpperCase().includes('NON') 
+                              ? 'bg-amber-100 text-amber-800' 
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {r.nature || r.purpose || 'NON CORPUS'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">{r.receiptNo}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination Footer Controls */}
+            {filteredReceipts.length > 0 && (
+              <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-slate-600 font-semibold">
+                <div>
+                  Showing {Math.min((currentPage - 1) * rowsPerPage + 1, filteredReceipts.length)} to {Math.min(currentPage * rowsPerPage, filteredReceipts.length)} of {filteredReceipts.length} entries
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="px-2.5 py-1.5 rounded-lg border bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 font-bold"
+                  >
+                    « First
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 rounded-lg border bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 font-bold"
+                  >
+                    ‹ Prev
+                  </button>
+
+                  <span className="px-3 py-1 text-slate-800 font-bold">
+                    Page {currentPage} of {totalPages}
+                  </span>
+
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                    className="px-3 py-1.5 rounded-lg border bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 font-bold"
+                  >
+                    Next ›
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage >= totalPages}
+                    className="px-2.5 py-1.5 rounded-lg border bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 font-bold"
+                  >
+                    Last »
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       );
@@ -1940,19 +2530,28 @@
       const [refNo, setRefNo] = useState('');
 
       // Auto generate sequential receipt number
+      const computedFY = useMemo(() => {
+        if (!receiptDate) return orgSettings.currentFY;
+        const d = new Date(receiptDate);
+        if (isNaN(d.getTime())) return orgSettings.currentFY;
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1; // 1-12
+        return m >= 4 ? `${y}-${String(y + 1).slice(-2)}` : `${y - 1}-${String(y).slice(-2)}`;
+      }, [receiptDate, orgSettings]);
+
       const nextReceiptNumber = useMemo(() => {
         const count = receipts.length + 1;
         const padded = String(count).padStart(6, '0');
-        return `${orgSettings.receiptPrefix}/${orgSettings.currentFY}/${padded}`;
-      }, [receipts, orgSettings]);
+        return `${orgSettings.receiptPrefix}/${computedFY}/${padded}`;
+      }, [receipts, orgSettings, computedFY]);
 
       const amountWords = useMemo(() => {
         return numberToWordsINR(Number(amount));
       }, [amount]);
 
       const handleSubmit = (createNext = false) => {
-        if (!donorName || !mobile || !amount) {
-          alert('Please fill all mandatory fields (Donor Name, Mobile, Amount).');
+        if (!donorName || !amount) {
+          alert('Please fill all mandatory fields (Donor Name, Amount).');
           return;
         }
 
@@ -1962,19 +2561,20 @@
         const newRec = {
           id: `REC-${Date.now()}`,
           receiptNo: nextReceiptNumber,
+          sNo: receipts.length + 1,
           date: receiptDate,
-          financialYear: orgSettings.currentFY,
+          financialYear: computedFY,
           month: monthName,
           donorName,
-          mobile,
-          email,
+          mobile: mobile || '',
+          email: email || '',
           pan: pan ? pan.toUpperCase() : '',
-          address,
+          address: address || '',
           amount: Number(amount),
           amountInWords: amountWords,
           purpose: purpose === 'Other' ? otherPurpose : purpose,
           paymentMode,
-          refNo: refNo || `${paymentMode}-VERIFIED`,
+          refNo: refNo || `${paymentMode}-DIRECT`,
           status: 'Completed',
           activities: []
         };
@@ -2006,8 +2606,8 @@
                   <input required type="date" value={receiptDate} onChange={e => setReceiptDate(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs font-bold" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Financial Year (Auto)</label>
-                  <input disabled type="text" value={orgSettings.currentFY} className="w-full bg-slate-100 border rounded-xl px-3 py-2 text-xs font-bold text-slate-500" />
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Financial Year (Auto from Date)</label>
+                  <input disabled type="text" value={`FY ${computedFY}`} className="w-full bg-slate-100 border rounded-xl px-3 py-2 text-xs font-bold text-slate-700" />
                 </div>
               </div>
 
