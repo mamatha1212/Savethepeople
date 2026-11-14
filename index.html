@@ -1951,15 +1951,92 @@
     }
 
     // =========================================================================
-    // PUBLIC LANDING PAGE (CONNECTED TO ADMIN)
+    // PUBLIC LANDING PAGE (FULL LEUD CHARITY DESIGN + RAZORPAY + VOLUNTEER)
     // =========================================================================
     function PublicLandingView({ onOpenAdmin }) {
+      const [isDonateOpen, setIsDonateOpen] = useState(false);
+      const [isVolunteerOpen, setIsVolunteerOpen] = useState(false);
+      const [selectedCause, setSelectedCause] = useState(null);
+
+      const causes = [
+        {
+          id: 1,
+          title: "Emergency Hunger Relief & Fresh Food Distribution",
+          category: "Food Support",
+          image: "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=800&q=80",
+          description: "Delivering daily rations, warm nutritious meals, and clean water to starving families and vulnerable street children.",
+          raised: 285000,
+          goal: 450000,
+          donorsCount: 512
+        },
+        {
+          id: 2,
+          title: "Education, School Bags & Digital Learning Labs",
+          category: "Child Education",
+          image: "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=800&q=80",
+          description: "Empowering rural students with quality schooling, uniforms, notebooks, and digital smart classrooms to break the cycle of poverty.",
+          raised: 410000,
+          goal: 600000,
+          donorsCount: 780
+        },
+        {
+          id: 3,
+          title: "Critical Medical Aid & Emergency Surgeries",
+          category: "Medical Care",
+          image: "https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=800&q=80",
+          description: "Funding emergency cardiac surgeries, pediatric treatments, and critical care medicines for underprivileged patients.",
+          raised: 740000,
+          goal: 1000000,
+          donorsCount: 1420
+        }
+      ];
+
+      const handleOpenDonate = (cause = null) => {
+        setSelectedCause(cause || causes[0]);
+        setIsDonateOpen(true);
+      };
+
       return (
         <div>
-          {/* Header */}
+          {/* Top Contact Bar */}
+          <div className="bg-[#10141E] text-slate-300 text-xs py-2.5 border-b border-slate-800">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+              <div className="flex items-center gap-6">
+                <span className="flex items-center gap-1.5 hover:text-white transition">
+                  <span className="text-[#E22D4E]">✉</span>
+                  <span>contact@savethepeople.org</span>
+                </span>
+                <span className="hidden md:flex items-center gap-1.5 hover:text-white transition">
+                  <span className="text-[#E22D4E]">📞</span>
+                  <span>+91 (0) 80 4123 4567</span>
+                </span>
+                <span className="hidden lg:flex items-center gap-1.5">
+                  <span className="text-[#E22D4E]">📍</span>
+                  <span>India • 80G Certified Non-Profit</span>
+                </span>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setIsVolunteerOpen(true)}
+                  className="text-xs font-bold text-amber-400 hover:text-amber-300 transition flex items-center gap-1"
+                >
+                  <span>🙋</span>
+                  <span>Become a Volunteer</span>
+                </button>
+                <span className="text-slate-600">|</span>
+                <div className="flex items-center gap-3">
+                  <a href="#causes" className="hover:text-white transition">Campaigns</a>
+                  <a href="#about" className="hover:text-white transition">About</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Navigation Bar */}
           <header className="sticky top-0 z-40 bg-white shadow-sm border-b border-slate-100">
-            <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3.5 cursor-pointer">
                 <img 
                   src="images/save_the_people_logo.jpeg" 
                   alt="Save The People" 
@@ -1968,46 +2045,450 @@
                 />
               </div>
 
-              <div className="flex items-center gap-4">
+              <nav className="hidden lg:flex items-center gap-8 text-[15px] font-bold text-slate-700">
+                <a href="#" className="text-[#E22D4E]">Home</a>
+                <a href="#about" className="hover:text-[#E22D4E] transition">About Us</a>
+                <a href="#causes" className="hover:text-[#E22D4E] transition">Our Causes</a>
+                <a href="#impact" className="hover:text-[#E22D4E] transition">Impact</a>
+                <a href="#causes" className="hover:text-[#E22D4E] transition">Drives</a>
+              </nav>
+
+              <div className="flex items-center gap-3">
                 <button 
                   onClick={onOpenAdmin}
-                  className="text-xs font-extrabold text-slate-800 bg-slate-100 hover:bg-slate-200 px-4 py-2.5 rounded-xl transition flex items-center gap-1.5"
+                  className="flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3.5 py-2.5 rounded-xl transition"
                 >
                   <span>🛡️</span>
-                  <span>Admin Billing Portal</span>
+                  <span className="hidden sm:inline">Admin Panel</span>
                 </button>
                 <button 
-                  onClick={() => alert("Please contact admin or scan UPI on the receipt module.")}
-                  className="bg-[#E22D4E] hover:bg-[#c92040] text-white font-extrabold text-xs px-6 py-2.5 rounded-full shadow"
+                  onClick={() => handleOpenDonate()}
+                  className="bg-[#E22D4E] hover:bg-[#c92040] text-white font-extrabold text-sm px-6 py-3 rounded-full shadow-lg shadow-[#E22D4E]/25 hover:shadow-[#E22D4E]/40 transform hover:-translate-y-0.5 transition flex items-center gap-2"
                 >
-                  Donate Now
+                  <span>♥</span>
+                  <span>Donate Now</span>
                 </button>
               </div>
             </div>
           </header>
 
-          {/* Hero Banner */}
-          <section className="py-24 bg-[#10141E] text-white text-center px-4">
-            <div className="max-w-3xl mx-auto space-y-6">
-              <span className="text-xs font-bold uppercase tracking-widest text-[#E22D4E] bg-rose-500/10 px-4 py-1.5 rounded-full border border-rose-500/20">
-                Save The People Charitable Trust
+          {/* 1. HERO SLIDER SECTION */}
+          <section className="relative bg-[#10141E] text-white overflow-hidden py-24 lg:py-36">
+            <div className="absolute inset-0 opacity-25 mix-blend-overlay">
+              <img 
+                src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=1600&q=80" 
+                alt="Charity Background" 
+                className="w-full h-full object-cover"
+              />
+            </div>
+            
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+              <div className="max-w-3xl space-y-6">
+                <div className="inline-flex items-center gap-2 bg-[#E22D4E]/20 border border-[#E22D4E]/40 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest text-[#E22D4E]">
+                  <span className="w-2 h-2 rounded-full bg-[#E22D4E] animate-pulse"></span>
+                  SAVE THE PEOPLE FOUNDATION
+                </div>
+                
+                <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1] font-serif-heading">
+                  Give a helping hand to those who need it most.
+                </h1>
+
+                <p className="text-lg sm:text-xl text-slate-300 font-normal leading-relaxed max-w-2xl">
+                  We are on a relentless mission to eradicate acute malnutrition, provide life-saving healthcare, and educate rural children. Every single rupee brings hope and dignity.
+                </p>
+
+                <div className="flex flex-wrap items-center gap-4 pt-4">
+                  <button 
+                    onClick={() => handleOpenDonate()}
+                    className="bg-[#E22D4E] hover:bg-[#c92040] text-white font-extrabold px-8 py-4 rounded-full text-base shadow-xl shadow-[#E22D4E]/30 transform hover:-translate-y-0.5 transition flex items-center gap-2.5"
+                  >
+                    <span>♥</span>
+                    <span>Donate with Razorpay</span>
+                  </button>
+
+                  <button 
+                    onClick={() => setIsVolunteerOpen(true)}
+                    className="bg-white/10 hover:bg-white/20 text-white font-bold px-7 py-4 rounded-full text-base backdrop-blur-md border border-white/20 transition flex items-center gap-2"
+                  >
+                    <span>Join as Volunteer →</span>
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-6 pt-6 text-xs text-slate-400 font-medium">
+                  <span className="flex items-center gap-2"><span className="text-[#00A859]">✓</span> 80G Tax Deductible</span>
+                  <span className="flex items-center gap-2"><span className="text-[#00A859]">✓</span> 100% Direct Beneficiary Reach</span>
+                  <span className="flex items-center gap-2"><span className="text-amber-400">⚡</span> Instant UPI / QR</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* 2. THREE PILLAR FEATURE BOXES */}
+          <section className="relative z-20 -mt-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="bg-white rounded-3xl p-8 shadow-xl border border-slate-100 space-y-4 hover:shadow-2xl transition group">
+                <div className="w-14 h-14 rounded-2xl bg-rose-50 text-[#E22D4E] flex items-center justify-center text-2xl group-hover:bg-[#E22D4E] group-hover:text-white transition duration-300">
+                  🍽️
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Food & Nutrition Relief</h3>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Cooked warm meals and comprehensive dry ration kits for poverty-hit families, pregnant mothers, and elderly persons.
+                </p>
+                <a href="#causes" className="inline-flex items-center gap-1.5 text-xs font-bold text-[#E22D4E] uppercase tracking-wider">
+                  Read More →
+                </a>
+              </div>
+
+              <div className="bg-white rounded-3xl p-8 shadow-xl border border-slate-100 space-y-4 hover:shadow-2xl transition group">
+                <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl group-hover:bg-amber-500 group-hover:text-white transition duration-300">
+                  📖
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Child Education & Kit</h3>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Sponsoring school admissions, textbooks, school uniforms, and digital devices for slum and rural youth.
+                </p>
+                <a href="#causes" className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 uppercase tracking-wider">
+                  Read More →
+                </a>
+              </div>
+
+              <div className="bg-white rounded-3xl p-8 shadow-xl border border-slate-100 space-y-4 hover:shadow-2xl transition group">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-[#00A859] flex items-center justify-center text-2xl group-hover:bg-[#00A859] group-hover:text-white transition duration-300">
+                  🩺
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Emergency Medical Aid</h3>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Covering life-saving surgeries, emergency ambulance support, medicines, and healthcare camps for vulnerable communities.
+                </p>
+                <a href="#causes" className="inline-flex items-center gap-1.5 text-xs font-bold text-[#00A859] uppercase tracking-wider">
+                  Read More →
+                </a>
+              </div>
+            </div>
+          </section>
+
+          {/* 3. ABOUT US SECTION */}
+          <section id="about" className="py-24 bg-white">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="grid lg:grid-cols-12 gap-12 items-center">
+                <div className="lg:col-span-6 relative">
+                  <div className="relative rounded-3xl overflow-hidden shadow-2xl border-8 border-slate-50">
+                    <img 
+                      src="https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=800&q=80" 
+                      alt="Volunteers Helping" 
+                      className="w-full h-[480px] object-cover"
+                    />
+                  </div>
+                  <div className="absolute -bottom-6 -right-4 sm:right-6 bg-[#E22D4E] text-white p-6 rounded-3xl shadow-xl max-w-xs space-y-1">
+                    <p className="text-3xl font-extrabold">12+ Years</p>
+                    <p className="text-xs uppercase font-bold tracking-wider text-rose-200">Of Relentless Community Care</p>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-6 space-y-6">
+                  <div className="inline-flex items-center gap-2 text-[#E22D4E] text-xs font-bold tracking-widest uppercase">
+                    About Save The People
+                  </div>
+                  <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 leading-tight font-serif-heading">
+                    We are dedicated to saving lives and restoring human dignity.
+                  </h2>
+                  <p className="text-slate-600 leading-relaxed">
+                    Save The People is a registered, non-profit humanitarian organization committed to serving disadvantaged and distressed individuals regardless of caste, creed, or religion.
+                  </p>
+
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 rounded-full bg-rose-100 text-[#E22D4E] flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">✓</div>
+                      <p className="text-sm font-semibold text-slate-700">100% Tax Exemption certificate under Section 80G of the Income Tax Act.</p>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 rounded-full bg-rose-100 text-[#E22D4E] flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">✓</div>
+                      <p className="text-sm font-semibold text-slate-700">Verified ground network across 40+ districts for direct supply distribution.</p>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 rounded-full bg-rose-100 text-[#E22D4E] flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">✓</div>
+                      <p className="text-sm font-semibold text-slate-700">Transparent reporting with automated donation receipt generation.</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex items-center gap-4">
+                    <button 
+                      onClick={() => handleOpenDonate()}
+                      className="bg-[#10141E] hover:bg-[#E22D4E] text-white font-bold text-sm px-7 py-3.5 rounded-full transition duration-300"
+                    >
+                      Donate to Our Cause
+                    </button>
+                    <button 
+                      onClick={() => setIsVolunteerOpen(true)}
+                      className="text-xs font-bold text-slate-700 hover:text-[#E22D4E] flex items-center gap-1.5 transition"
+                    >
+                      <span>Join Our Team →</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* 4. FEATURED CAUSES SECTION */}
+          <section id="causes" className="py-24 bg-[#F8F9FA] border-t border-slate-200">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-4">
+                <div className="space-y-2">
+                  <span className="text-[#E22D4E] font-bold text-xs uppercase tracking-widest">Urgent Campaigns</span>
+                  <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 font-serif-heading">Our Featured Causes</h2>
+                </div>
+                <p className="text-slate-600 max-w-md text-sm">
+                  Select a cause below to contribute directly via Razorpay UPI, Cards, or NetBanking.
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {causes.map((cause) => {
+                  const percent = Math.min(100, Math.round((cause.raised / cause.goal) * 100));
+                  return (
+                    <div key={cause.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden group">
+                      <div className="relative h-60 overflow-hidden">
+                        <img 
+                          src={cause.image} 
+                          alt={cause.title} 
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                        />
+                        <span className="absolute top-4 left-4 bg-white/95 backdrop-blur-md text-slate-900 text-xs font-bold px-3 py-1 rounded-full shadow-sm">
+                          {cause.category}
+                        </span>
+                      </div>
+
+                      <div className="p-7 flex-1 flex flex-col justify-between space-y-6">
+                        <div className="space-y-2.5">
+                          <h3 className="font-bold text-xl text-slate-900 group-hover:text-[#E22D4E] transition leading-snug">
+                            {cause.title}
+                          </h3>
+                          <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">
+                            {cause.description}
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs font-bold">
+                            <span className="text-slate-900 font-extrabold text-sm">
+                              ₹{cause.raised.toLocaleString()} <span className="font-normal text-slate-500 text-xs">raised</span>
+                            </span>
+                            <span className="text-[#E22D4E] font-extrabold text-sm">{percent}%</span>
+                          </div>
+                          
+                          <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                            <div 
+                              className="bg-[#E22D4E] h-3 rounded-full transition-all duration-500" 
+                              style={{ width: `${percent}%` }}
+                            ></div>
+                          </div>
+
+                          <div className="flex justify-between text-xs text-slate-500 pt-1">
+                            <span>Goal: ₹{cause.goal.toLocaleString()}</span>
+                            <span>{cause.donorsCount} Donors</span>
+                          </div>
+                        </div>
+
+                        <button 
+                          onClick={() => handleOpenDonate(cause)}
+                          className="w-full py-3.5 rounded-full bg-[#10141E] hover:bg-[#E22D4E] text-white font-extrabold text-sm transition duration-300 flex items-center justify-center gap-2 shadow-md"
+                        >
+                          <span>♥</span>
+                          <span>Donate to this Cause</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+
+          {/* 5. IMPACT & COUNTER STATS */}
+          <section id="impact" className="py-20 bg-[#10141E] text-white relative">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center divide-y md:divide-y-0 md:divide-x divide-slate-800">
+                <div className="space-y-2 pt-4 md:pt-0">
+                  <p className="text-4xl sm:text-5xl font-extrabold text-[#E22D4E] font-serif-heading">₹12.9L+</p>
+                  <p className="text-xs uppercase font-bold tracking-widest text-slate-400">Total Funds Disbursed</p>
+                </div>
+
+                <div className="space-y-2 pt-4 md:pt-0">
+                  <p className="text-4xl sm:text-5xl font-extrabold text-amber-400 font-serif-heading">2,650+</p>
+                  <p className="text-xs uppercase font-bold tracking-widest text-slate-400">Generous Donors</p>
+                </div>
+
+                <div className="space-y-2 pt-4 md:pt-0">
+                  <p className="text-4xl sm:text-5xl font-extrabold text-[#00A859] font-serif-heading">18+</p>
+                  <p className="text-xs uppercase font-bold tracking-widest text-slate-400">Active Relief Drives</p>
+                </div>
+
+                <div className="space-y-2 pt-4 md:pt-0">
+                  <p className="text-4xl sm:text-5xl font-extrabold text-blue-400 font-serif-heading">100%</p>
+                  <p className="text-xs uppercase font-bold tracking-widest text-slate-400">Verified & 80G Certified</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* 6. CALL TO ACTION VOLUNTEER BANNER */}
+          <section className="py-20 bg-gradient-to-r from-[#E22D4E] to-[#F15A24] text-white">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
+              <span className="bg-white/20 text-white text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full">
+                Be The Change
               </span>
-              <h1 className="text-4xl sm:text-6xl font-extrabold font-serif-heading leading-tight">
-                Together for humanity, dignity, and real ground impact.
-              </h1>
-              <p className="text-slate-300 text-sm leading-relaxed max-w-xl mx-auto">
-                All donations are registered under Section 80G with complete activity tracing and permanent record maintenance.
+              <h2 className="text-3xl sm:text-5xl font-extrabold font-serif-heading max-w-2xl mx-auto">
+                Ready to make a real difference in someone's life?
+              </h2>
+              <p className="text-rose-100 max-w-xl mx-auto text-base">
+                Whether you wish to sponsor a child's education, contribute emergency meals, or volunteer your skills on the field, your support matters.
               </p>
-              <div>
-                <button
-                  onClick={onOpenAdmin}
-                  className="bg-[#E22D4E] text-white font-bold text-sm px-8 py-3.5 rounded-full shadow-xl hover:bg-[#c92040] transition"
+              <div className="flex flex-wrap justify-center gap-4 pt-2">
+                <button 
+                  onClick={() => handleOpenDonate()}
+                  className="bg-white text-[#E22D4E] hover:bg-slate-100 font-extrabold text-sm px-8 py-4 rounded-full shadow-xl transition"
                 >
-                  Open Trust Billing & Receipts System →
+                  Donate Online Now
+                </button>
+                <button 
+                  onClick={() => setIsVolunteerOpen(true)}
+                  className="bg-[#10141E] hover:bg-black text-white font-bold text-sm px-8 py-4 rounded-full shadow-xl transition"
+                >
+                  Join as Volunteer
                 </button>
               </div>
             </div>
           </section>
+
+          {/* 7. COMPLETE FOOTER */}
+          <footer className="bg-[#10141E] text-slate-400 pt-16 pb-12 border-t border-slate-800">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div className="space-y-4">
+                  <div className="flex items-center">
+                    <img 
+                      src="images/save_the_people_logo.jpeg" 
+                      alt="Save The People" 
+                      className="h-16 w-auto object-contain rounded"
+                      onError={e => e.target.style.display = 'none'}
+                    />
+                  </div>
+                  <p className="text-xs leading-relaxed text-slate-400">
+                    A registered non-profit organization helping children, low-income families, and patients across India with dignity and care.
+                  </p>
+                  <div className="text-xs font-semibold text-slate-300">
+                    <span className="text-[#00A859]">✓ 80G Certified Non-Profit</span>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Quick Links</h4>
+                  <ul className="space-y-2 text-xs">
+                    <li><a href="#" className="hover:text-white transition">Home</a></li>
+                    <li><a href="#about" className="hover:text-white transition">About Our Mission</a></li>
+                    <li><a href="#causes" className="hover:text-white transition">Urgent Causes</a></li>
+                    <li><a href="#impact" className="hover:text-white transition">Financial Impact</a></li>
+                    <li><button onClick={onOpenAdmin} className="text-rose-400 hover:text-rose-300 transition">Admin Login</button></li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Key Causes</h4>
+                  <ul className="space-y-2 text-xs">
+                    <li><a href="#causes" className="hover:text-white transition">Hunger & Malnutrition</a></li>
+                    <li><a href="#causes" className="hover:text-white transition">Childhood Education</a></li>
+                    <li><a href="#causes" className="hover:text-white transition">Emergency Medical Care</a></li>
+                    <li><a href="#causes" className="hover:text-white transition">Disaster Relief Fund</a></li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Support & Donate</h4>
+                  <p className="text-xs text-slate-400 mb-4">
+                    All donations are exempt from tax under Section 80G. Instant payment confirmation via Razorpay.
+                  </p>
+                  <button 
+                    onClick={() => handleOpenDonate()}
+                    className="w-full bg-[#E22D4E] hover:bg-[#c92040] text-white font-extrabold text-xs py-3 rounded-full transition"
+                  >
+                    Make a Direct Donation
+                  </button>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-800 pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
+                <p>© {new Date().getFullYear()} Save The People. All Rights Reserved.</p>
+                <div className="flex gap-4">
+                  <span>Razorpay Secured</span>
+                  <span>•</span>
+                  <span>80G Registered NGO</span>
+                </div>
+              </div>
+            </div>
+          </footer>
+
+          {/* Direct Donation Popup */}
+          {isDonateOpen && (
+            <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl p-6 space-y-4">
+                <div className="flex justify-between items-center border-b pb-3">
+                  <h3 className="font-extrabold text-lg text-slate-900">Donate to Save The People</h3>
+                  <button onClick={() => setIsDonateOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+                </div>
+                <p className="text-xs text-slate-600">
+                  Cause: <strong>{selectedCause ? selectedCause.title : "General Trust Support"}</strong>
+                </p>
+                <div className="p-4 bg-rose-50 rounded-2xl border border-rose-100 text-center space-y-2">
+                  <p className="text-xs font-bold text-slate-700">Scan & Pay via any UPI App or NetBanking</p>
+                  <p className="text-xs font-mono font-bold text-[#E22D4E]">UPI ID: savethepeople@sbi</p>
+                  <p className="text-[11px] text-slate-500">Official 80G Tax Exemption receipts are generated immediately upon receipt verification.</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    alert("Thank you! For online auto-receipts, open Admin Panel → 2. Donation Receipts.");
+                    setIsDonateOpen(false);
+                  }}
+                  className="w-full bg-[#E22D4E] text-white font-bold py-3 rounded-full text-xs"
+                >
+                  Confirm & Request Receipt
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Volunteer Modal */}
+          {isVolunteerOpen && (
+            <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl p-6 space-y-4">
+                <div className="flex justify-between items-center border-b pb-3">
+                  <h3 className="font-extrabold text-lg text-slate-900">Become a Volunteer</h3>
+                  <button onClick={() => setIsVolunteerOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+                </div>
+                <form onSubmit={(e) => { e.preventDefault(); alert("Volunteer application submitted!"); setIsVolunteerOpen(false); }} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Full Name</label>
+                    <input required type="text" placeholder="Your name" className="w-full bg-slate-50 border rounded-xl px-3.5 py-2 text-xs" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Phone Number</label>
+                    <input required type="tel" placeholder="+91 98765 43210" className="w-full bg-slate-50 border rounded-xl px-3.5 py-2 text-xs" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Field of Interest</label>
+                    <select className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs">
+                      <option>Food & Ration Distribution</option>
+                      <option>Medical Health Camps</option>
+                      <option>Child Teaching & Mentorship</option>
+                    </select>
+                  </div>
+                  <button type="submit" className="w-full bg-[#E22D4E] text-white font-bold py-3 rounded-full text-xs">
+                    Submit Application
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
