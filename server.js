@@ -23,8 +23,8 @@ const server = http.createServer((req, res) => {
   const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
   let pathname = parsedUrl.pathname;
 
-  // Clean URLs: Route "/" and "/admin" directly to index.html without showing .html
-  if (pathname === '/' || pathname === '/admin') {
+  // Clean URLs: Route root and all /admin subpaths directly to index.html
+  if (pathname === '/' || pathname.startsWith('/admin')) {
     pathname = '/index.html';
   }
 
